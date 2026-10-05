@@ -143,6 +143,48 @@ const AddPayslip = () => {
     setFile(selected);
   };
 
+  const handleAutoGenerate = async () => {
+    if (loading) return;
+    if (!/^\d{4}-\d{2}$/.test(form.month)) {
+      setAlertState({ variant: "error", title: "Missing Month", message: "Choose the payroll month first." });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/payslip/auto-generate`, 
+        { month: form.month, employeeId: id }, 
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      
+      if (res.data.success) {
+        const p = res.data.payslip || {};
+        setPosted({
+          month: p.month || form.month,
+          overtimePay: p.overtimePay,
+          grossSalary: p.grossSalary,
+          totalDeductions: p.totalDeductions,
+          netSalary: p.netSalary,
+        });
+        setAlertState({
+          variant: "success",
+          title: "Auto-Generated!",
+          message: `Payslip PDF generated & posted. Server-calculated net pay: ${inr(p.netSalary)}.`
+        });
+        fetchHistory();
+        setForm(emptyForm());
+      }
+    } catch (err) {
+      setAlertState({
+        variant: "error",
+        title: "Auto-Generate Failed",
+        message: apiErrorMessage(err, "The payslip could not be auto-generated. Please check if they have a base salary set.")
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Client-side ESTIMATE only - the server computes the stored totals.
   const calculations = useMemo(() => {
     const n = (k) => Number(form[k] || 0);
@@ -322,9 +364,14 @@ const AddPayslip = () => {
                 </div>
               </div>
 
-              <button disabled={loading} className="w-full bg-[#1C1A17] text-[#F6F3EC] py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md hover:bg-[#B8912E] hover:text-[#1C1A17] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed">
-                {loading ? "COMMITTING DATA..." : "Finalize & Post Statement"}
-              </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button type="button" onClick={handleAutoGenerate} disabled={loading} className="w-full bg-[#3F6B52] text-[#F6F3EC] py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md hover:bg-[#B8912E] hover:text-[#1C1A17] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "PROCESSING..." : "Auto-Generate PDF"}
+                </button>
+                <button type="submit" disabled={loading} className="w-full bg-[#1C1A17] text-[#F6F3EC] py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-md hover:bg-[#B8912E] hover:text-[#1C1A17] transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed">
+                  {loading ? "COMMITTING DATA..." : "Manual Post"}
+                </button>
+              </div>
             </form>
           </div>
 

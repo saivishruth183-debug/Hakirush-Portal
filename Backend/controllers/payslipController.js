@@ -3,6 +3,8 @@ import { asyncHandler, badRequest, conflict, forbidden, notFound } from "../midd
 import { requireObjectId, toFiniteNumber, requireEnum } from "../utils/validate.js";
 import { now as clockNow } from "../services/clock.js";
 import { findEmployeeByAnyId, getEmployeeForUser, resolveEmployeeForCaller } from "../services/employeeScope.js";
+import { generatePayslipPdf } from "../services/pdfService.js";
+import { buildMonthlyAttendance } from "../services/attendanceService.js";
 import {
   storePayslipPdf,
   removePayslipFile,
@@ -96,6 +98,88 @@ export const addPayslip = asyncHandler(async (req, res) => {
       ...figures,
       paymentStatus,
       paymentDate: paymentStatus === "Paid" ? now : null,
+      payslipFile: stored.url,
+      fileId: stored.fileId,
+      filePath: stored.filePath,
+      storage: "private",
+      isPrivateFile: true,
+      createdBy: req.user._id,
+    });
+  } catch (err) {
+    await removePayslipFile(stored.fileId);
+    if (err?.code === 11000) throw conflict("A payslip for this employee and month already exists", "CONFLICT");
+    throw err;
+  }
+
+  return res.status(201).json({ success: true, payslip: toDto(payslip, { forAdmin: true, now }) });
+});
+
+/* ================= AUTO-GENERATE PAYSLIP (ADMIN) ================= */
+export const autoGeneratePayslip = asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const employeeRef = requireObjectId(body.employeeId, "employeeId");
+  const month = typeof body.month === "string" ? body.month.trim() : "";
+  if (!MONTH_RE.test(month)) throw badRequest("month must be YYYY-MM");
+  
+  const employee = await findEmployeeByAnyId(employeeRef);
+  if (!employee) throw notFound("Employee not found");
+  await employee.populate("userId"); // Need name
+
+  if (await Payslip.exists({ employee: employee._id, month })) {
+    throw conflict("A payslip for this employee and month already exists", "CONFLICT");
+  }
+
+  const now = clockNow();
+  const [yyyy, mm] = month.split("-").map(Number);
+
+  // Get attendance data for LOP calculation
+  const { attendance: monthAttendance } = await buildMonthlyAttendance({
+    employee,
+    year: yyyy,
+    month: mm,
+    now,
+  });
+
+  // Calculate Loss Of Pay (LOP)
+  // Assuming a standard 22 working days per month (or calculate dynamically from monthAttendance)
+  const totalWorkingDays = monthAttendance.length || 22;
+  const absentDays = monthAttendance.filter(a => a.status === "Absent" || a.status === "Leave").length;
+  
+  const basicSalary = employee.salary || 0;
+  let lossOfPay = 0;
+  if (totalWorkingDays > 0) {
+    lossOfPay = Math.round((basicSalary / totalWorkingDays) * absentDays);
+  }
+
+  // Auto-calculated figures
+  const figures = computePayslipFigures({
+    basicSalary,
+    lossOfPay,
+    // Add standard defaults
+    providentFund: Math.round(basicSalary * 0.12), // 12% standard PF
+    professionalTax: 200, // standard PT in India
+  });
+
+  // Generate PDF
+  const pdfBuffer = await generatePayslipPdf({ ...figures, month }, employee, employee.userId);
+
+  // Mock a Multer file object for storePayslipPdf
+  const fileObj = {
+    buffer: pdfBuffer,
+    originalname: `payslip-${month}.pdf`,
+    mimetype: "application/pdf",
+  };
+
+  const stored = await storePayslipPdf(fileObj, { employeeCode: employee.employeeId, month });
+
+  let payslip;
+  try {
+    payslip = await Payslip.create({
+      employee: employee._id,
+      month,
+      ...figures,
+      paymentStatus: "Paid", // Auto-generated usually assumes Paid or can be configured
+      paymentDate: now,
       payslipFile: stored.url,
       fileId: stored.fileId,
       filePath: stored.filePath,

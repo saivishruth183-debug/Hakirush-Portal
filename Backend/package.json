@@ -28,6 +28,7 @@
     "nodemailer": "^8.0.11",
     "nodemon": "^3.1.11",
     "path": "^0.12.7",
+    "pdfkit": "^0.20.2",
     "react-data-table-component": "^7.7.0"
   },
   "devDependencies": {
