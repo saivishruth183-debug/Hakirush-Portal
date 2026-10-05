@@ -18,6 +18,7 @@ import stallRoutes from "./routes/stallRoutes.js";
 import payslipRoutes from "./routes/payslipRoutes.js";
 import attendanceRequestRouter from "./routes/attendanceRequestRoutes.js";
 import notificationRoute from "./routes/notificationRoute.js";
+import assetRoutes from "./routes/assetRoutes.js";
 import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +61,7 @@ export const createApp = () => {
   app.use("/api/payslip", payslipRoutes);
   app.use("/api/attendance-request", attendanceRequestRouter);
   app.use("/api/notifications", notificationRoute);
+  app.use("/api/asset", assetRoutes);
 
   app.get("/api/test", (req, res) => {
     res.json({ success: true, message: "Backend is working!" });

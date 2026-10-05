@@ -41,6 +41,7 @@ import AddHoliday from "./components/holidays/AddHolidays";
 import AdminAnnouncement from "./components/announcement/AdminAnnouncement";
 import EditAnnouncement from "./components/announcement/EditAnnouncement";
 import AddPayslip from "./components/payslips/AddPayslip";
+import AdminAssets from "./components/assets/AdminAssets";
 
 /* ================= EMPLOYEE IMPORTS ================= */
 import EmployeeDashboard from "./pages/EmployeeDashboard";
@@ -119,6 +120,8 @@ const App = () => {
 
           <Route path="announcement" element={<AdminAnnouncement />} />
           <Route path="announcement/edit/:id" element={<EditAnnouncement />} />
+
+          <Route path="assets" element={<AdminAssets />} />
         </Route>
 
         {/* ================= EMPLOYEE ROUTES ================= */}

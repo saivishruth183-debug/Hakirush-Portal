@@ -13,6 +13,7 @@ import {
   PartyPopper,
   BadgeDollarSign,
   Store,
+  Briefcase,
 } from "lucide-react";
 import { useSidebar } from "../../context/sidebarContext";
 
@@ -43,6 +44,7 @@ const sidebarLinks = [
   { link: "/admin-dashboard/leaves", icon: CalendarCheck, title: "Leaves" },
   { link: "/admin-dashboard/holidays", icon: PartyPopper, title: "Holidays" },
   { link: "/admin-dashboard/announcement", icon: Bell, title: "Announcement" },
+  { link: "/admin-dashboard/assets", icon: Briefcase, title: "Assets" },
 ];
 
 const AdminSidebar = () => {
