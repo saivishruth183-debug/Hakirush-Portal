@@ -3,7 +3,7 @@ import Logo from "/favicon.png";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
-  Handshake,
+  Shirt,
   Settings,
   X,
   ShieldCheck,
@@ -32,8 +32,8 @@ const ClientSidebar = () => {
     { link: "/client-dashboard", icon: LayoutDashboard, title: "Dashboard" },
     {
       link: `/client-dashboard/ourrelationship/${user?._id}`,
-      icon: Handshake,
-      title: "Our Relationship",
+      icon: Shirt,
+      title: "Roster",
     },
     { link: "/client-dashboard/setting", icon: Settings, title: "Settings" },
   ];
