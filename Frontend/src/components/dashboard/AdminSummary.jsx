@@ -238,11 +238,20 @@ const AdminSummary = () => {
         if (mounted && r?.data) { setAtt(r.data); setSynced(new Date()); }
       } catch {}
     }, 10000);
+    const summaryTimer = setInterval(async () => {
+      try {
+        const r = await axios.get(`${API}/api/dashboard/summary`, authConfig());
+        if (mounted && r?.data) setSummary(r.data);
+      } catch (e) {
+        console.error("Dashboard Summary Refresh Error:", e);
+      }
+    }, 30000);
     const clock = setInterval(() => setNow(new Date()), 30000);
     return () => {
       mounted = false;
       window.removeEventListener("focus", refreshOnFocus);
       clearInterval(attTimer);
+      clearInterval(summaryTimer);
       clearInterval(clock);
     };
   }, [fetchAll]);
