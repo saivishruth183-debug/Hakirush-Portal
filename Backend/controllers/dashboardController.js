@@ -18,19 +18,30 @@ const getSummary = async (req, res) => {
     const totalQuarterly = await Client.countDocuments({ planType: "Quarterly" });
 
     /* ========== LEAVE SUMMARY ========== */
-    const employeeAppliedForLeave = await Leave.distinct("employeeId");
-
     const leaveStatus = await Leave.aggregate([
+      {
+        $lookup: {
+          from: "employees",
+          localField: "employeeId",
+          foreignField: "_id",
+          as: "employee",
+        },
+      },
+      { $match: { "employee.0": { $exists: true } } },
       {
         $group: {
           _id: { $toUpper: "$status" },
           count: { $sum: 1 },
+          employeeIds: { $addToSet: "$employeeId" },
         },
       },
     ]);
+    const employeeAppliedForLeave = new Set(
+      leaveStatus.flatMap((status) => status.employeeIds.map((id) => String(id)))
+    );
 
     const leaveSummary = {
-      appliedFor: employeeAppliedForLeave.length,
+      appliedFor: employeeAppliedForLeave.size,
       approved: leaveStatus.find(i => i._id === "APPROVED")?.count || 0,
       rejected: leaveStatus.find(i => i._id === "REJECTED")?.count || 0,
       pending: leaveStatus.find(i => i._id === "PENDING")?.count || 0,
