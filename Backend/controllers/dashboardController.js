@@ -4,6 +4,7 @@ import Department from "../models/Department.js";
 import Leave from "../models/Leave.js";
 import Sponsor from "../models/Sponsor.js";
 import Stall from "../models/Stall.js";
+import { sendError } from "../middleware/errorHandler.js";
 
 const getSummary = async (req, res) => {
   try {
@@ -17,12 +18,9 @@ const getSummary = async (req, res) => {
     const totalQuarterly = await Client.countDocuments({ planType: "Quarterly" });
 
     /* ========== LEAVE SUMMARY ========== */
-    const activeEmployeeIds = await Employee.distinct("_id");
-    const activeLeaveFilter = { employeeId: { $in: activeEmployeeIds } };
-    const employeeAppliedForLeave = await Leave.distinct("employeeId", activeLeaveFilter);
+    const employeeAppliedForLeave = await Leave.distinct("employeeId");
 
     const leaveStatus = await Leave.aggregate([
-      { $match: activeLeaveFilter },
       {
         $group: {
           _id: { $toUpper: "$status" },
@@ -185,11 +183,7 @@ const sponsorSummary = {
     });
 
   } catch (error) {
-    console.error("DASHBOARD SUMMARY ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    return sendError(res, error);
   }
 };
 
