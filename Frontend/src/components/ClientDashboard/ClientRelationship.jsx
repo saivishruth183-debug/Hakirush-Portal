@@ -1,275 +1,514 @@
-import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
-import { Trash2, User, Shirt, PlusCircle, ShieldCheck, Loader2, AlertCircle, RefreshCw } from "lucide-react";
-import { apiErrorMessage } from "../../utils/apiError";
+import React, { useMemo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Trash2,
+  User,
+  Shirt,
+  PlusCircle,
+  ShieldCheck,
+  Trophy,
+  Search,
+  Download,
+  Users,
+  Clock,
+  Undo2,
+  CheckCircle2,
+  ChevronDown,
+} from "lucide-react";
 
-const JERSEY_SIZES = [
-  { value: "XS", label: "XS - Extra Small" },
-  { value: "S", label: "S - Small" },
-  { value: "M", label: "M - Medium" },
-  { value: "L", label: "L - Large" },
-  { value: "XL", label: "XL - Extra Large" },
-  { value: "XXL", label: "XXL - Double Large" },
+/* 👉 Edit these lists to match your events / sizes */
+const EVENTS = ["Cricket", "Football", "Badminton", "Volleyball", "Kabaddi", "Athletics"];
+const SIZES = [
+  { value: "XS", label: "Extra Small" },
+  { value: "S", label: "Small" },
+  { value: "M", label: "Medium" },
+  { value: "L", label: "Large" },
+  { value: "XL", label: "Extra Large" },
+  { value: "XXL", label: "Double XL" },
 ];
 
-const rosterUrl = `${import.meta.env.VITE_BACKEND_URL}/api/client/me/roster`;
-const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+const avatarColors = [
+  "from-red-500 to-rose-600",
+  "from-sky-500 to-blue-600",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-violet-500 to-purple-600",
+  "from-slate-600 to-slate-800",
+];
+const colorFor = (s = "") => avatarColors[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % avatarColors.length];
+const initials = (n = "") => n.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "?";
 
-const formatTimestamp = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-};
-
-// Roster is persisted per client: GET/POST /api/client/me/roster,
-// DELETE /api/client/me/roster/:entryId (owner only).
 const ClientRelationship = () => {
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [formError, setFormError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-
-  const [formData, setFormData] = useState({
-    name: "",
-    jerseySize: ""
-  });
-
-  const loadRoster = useCallback(async () => {
-    try {
-      const res = await axios.get(rosterUrl, { headers: authHeaders() });
-      setEntries(Array.isArray(res.data?.entries) ? res.data.entries : []);
-      setLoadError("");
-    } catch (err) {
-      setLoadError(apiErrorMessage(err, "Couldn't load your roster."));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [employees, setEmployees] = useState([]);
+  const [formData, setFormData] = useState({ name: "", event: "", jerseySize: "" });
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [eventFilter, setEventFilter] = useState("All");
+  const [toast, setToast] = useState(null); // { type: "added" | "removed", emp, index }
 
   useEffect(() => {
-    loadRoster();
-  }, [loadRoster]);
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
 
-  const retryLoad = () => {
-    setLoading(true);
-    setLoadError("");
-    loadRoster();
-  };
-
-  // Handle Input Changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (formError) setFormError("");
+    setError("");
   };
 
-  // Handle Form Submission
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (submitting) return;
-    const name = formData.name.trim();
-    if (!name || !formData.jerseySize) {
-      setFormError("Enter a name and choose a jersey size.");
-      return;
-    }
+    if (!formData.name.trim()) return setError("Please enter the employee's name.");
+    if (!formData.event) return setError("Please choose an event.");
+    if (!formData.jerseySize) return setError("Please pick a jersey size.");
 
-    setSubmitting(true);
-    setFormError("");
-    try {
-      const res = await axios.post(
-        rosterUrl,
-        { name, jerseySize: formData.jerseySize },
-        { headers: authHeaders() }
-      );
-      if (res.data?.success && res.data.entry) {
-        setEntries((prev) => [res.data.entry, ...prev]);
-      } else {
-        await loadRoster();
-      }
-      setFormData({ name: "", jerseySize: "" }); // Reset fields
-    } catch (err) {
-      setFormError(apiErrorMessage(err, "Couldn't add this person to the roster."));
-    } finally {
-      setSubmitting(false);
-    }
+    const newEmployee = {
+      id: Date.now(),
+      name: formData.name.trim(),
+      event: formData.event,
+      jerseySize: formData.jerseySize,
+      registrationTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setEmployees((prev) => [newEmployee, ...prev]);
+    setFormData((prev) => ({ name: "", event: prev.event, jerseySize: "" })); // keep event for quick bulk entry
+    setToast({ type: "added", emp: newEmployee });
   };
 
-  // Handle Data Deletion
-  const handleDelete = async (entryId) => {
-    if (deletingId) return;
-    if (!window.confirm("Remove this person from the roster?")) return;
-    setDeletingId(entryId);
-    try {
-      await axios.delete(`${rosterUrl}/${entryId}`, { headers: authHeaders() });
-      setEntries((prev) => prev.filter((entry) => entry._id !== entryId));
-    } catch (err) {
-      alert(apiErrorMessage(err, "Couldn't remove this roster entry."));
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDelete = (id) => {
+    const index = employees.findIndex((e) => e.id === id);
+    if (index === -1) return;
+    const emp = employees[index];
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    setToast({ type: "removed", emp, index });
   };
+
+  const handleUndo = () => {
+    if (toast?.type !== "removed") return;
+    setEmployees((prev) => {
+      const next = [...prev];
+      next.splice(toast.index, 0, toast.emp);
+      return next;
+    });
+    setToast(null);
+  };
+
+  const exportCSV = () => {
+    const rows = [["Name", "Event", "Jersey Size", "Registered"], ...employees.map((e) => [e.name, e.event, e.jerseySize, e.registrationTime])];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "roster.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const sizeCounts = useMemo(
+    () => SIZES.map((s) => ({ ...s, count: employees.filter((e) => e.jerseySize === s.value).length })),
+    [employees]
+  );
+  const maxSize = Math.max(...sizeCounts.map((s) => s.count), 1);
+
+  const eventCounts = useMemo(() => {
+    const m = {};
+    employees.forEach((e) => (m[e.event] = (m[e.event] || 0) + 1));
+    return m;
+  }, [employees]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return employees.filter(
+      (e) =>
+        (eventFilter === "All" || e.event === eventFilter) &&
+        (!q || [e.name, e.event, e.jerseySize].some((v) => v.toLowerCase().includes(q)))
+    );
+  }, [employees, query, eventFilter]);
+
+  const topEvent = Object.entries(eventCounts).sort((a, b) => b[1] - a[1])[0];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-red-50 to-pink-50 text-slate-900 font-sans p-6 lg:p-16 selection:bg-red-100">
-      <div className="max-w-4xl mx-auto space-y-12">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] text-slate-900 font-sans selection:bg-red-200/60">
+      {/* ================= HERO ================= */}
+      <section className="relative overflow-hidden bg-slate-950 text-white">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/95 to-red-950/80" />
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-red-600/30 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 rounded-full bg-rose-500/10 blur-3xl" />
 
-        {/* TITLE HEADER */}
-        <div className="border-l-8 border-red-600 pl-8">
-          <h2 className="text-4xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">
-            Roster & Apparel<br/><span className="text-red-600 text-5xl">Management</span>
-          </h2>
-          <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.5em] mt-3">Personnel Unit Allocation</p>
+        <div className="relative max-w-6xl mx-auto px-6 md:px-10 pt-10 pb-20 md:pt-14 md:pb-24">
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[11px] font-semibold uppercase tracking-[0.2em] text-red-300">
+              <Shirt size={13} /> Kit Allocation
+            </span>
+            <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight leading-[1.05]">
+              Roster & Apparel <span className="text-red-500">Management</span>
+            </h1>
+            <p className="mt-3 text-sm md:text-base text-slate-400 max-w-xl">
+              Register players for each event, assign jersey sizes and keep your kit order ready in one place.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="max-w-6xl mx-auto px-6 md:px-10 -mt-12 pb-16 space-y-8 relative">
+        {/* ================= STATS ================= */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard i={0} icon={Users} label="Players Registered" value={employees.length} tone="bg-slate-900 shadow-slate-900/20" />
+          <StatCard i={1} icon={Trophy} label="Events Covered" value={Object.keys(eventCounts).length} tone="bg-red-600 shadow-red-600/30" />
+          <StatCard
+            i={2}
+            icon={Shirt}
+            label="Most Popular Event"
+            value={topEvent ? topEvent[0] : "—"}
+            sub={topEvent ? `${topEvent[1]} players` : "No entries yet"}
+            tone="bg-emerald-500 shadow-emerald-500/30"
+          />
         </div>
 
-        {/* REGISTRATION FORM CARD */}
-        <div className="bg-white/80 backdrop-blur-2xl border border-slate-100 p-8 rounded-[2.5rem] shadow-[0_8px_32px_rgba(220,38,38,0.04)]">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* ================= FORM ================= */}
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="lg:col-span-3 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 p-6 md:p-8 space-y-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-100">
+                <PlusCircle size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-extrabold tracking-tight">Add a player</h2>
+                <p className="text-xs text-slate-400">The event stays selected so you can add players quickly.</p>
+              </div>
+            </div>
 
-            {/* Input Name */}
-            <div className="space-y-2">
-              <label htmlFor="roster-name" className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Employee Name</label>
+            {/* Name */}
+            <Field label="Employee name">
               <div className="relative">
                 <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  id="roster-name"
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
                   placeholder="e.g. John Doe"
-                  maxLength={100}
-                  required
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-bold text-slate-800 placeholder-slate-300 focus:outline-none focus:border-red-400 focus:bg-white transition-all"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-red-300 focus:bg-white focus:ring-4 focus:ring-red-100 transition"
                 />
               </div>
-            </div>
+            </Field>
 
-            {/* Selector Size */}
-            <div className="space-y-2">
-              <label htmlFor="roster-size" className="block text-[9px] font-black uppercase tracking-widest text-slate-400">Jersey Size</label>
+            {/* Event */}
+            <Field label="Event">
               <div className="relative">
-                <Shirt size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Trophy size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <select
-                  id="roster-size"
-                  name="jerseySize"
-                  value={formData.jerseySize}
+                  name="event"
+                  value={formData.event}
                   onChange={handleInputChange}
-                  required
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-3.5 pl-12 pr-4 text-sm font-black text-slate-700 focus:outline-none focus:border-red-400 focus:bg-white transition-all appearance-none uppercase italic"
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-10 text-sm font-semibold focus:outline-none focus:border-red-300 focus:bg-white focus:ring-4 focus:ring-red-100 transition appearance-none ${
+                    formData.event ? "text-slate-800" : "text-slate-400"
+                  }`}
                 >
-                  <option value="" disabled hidden>Select Size</option>
-                  {JERSEY_SIZES.map((size) => (
-                    <option key={size.value} value={size.value}>{size.label}</option>
+                  <option value="" disabled hidden>Select an event</option>
+                  {EVENTS.map((ev) => (
+                    <option key={ev} value={ev}>{ev}</option>
                   ))}
                 </select>
+                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </Field>
+
+            {/* Size chips */}
+            <Field label="Jersey size">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {SIZES.map((s) => {
+                  const active = formData.jerseySize === s.value;
+                  return (
+                    <button
+                      type="button"
+                      key={s.value}
+                      onClick={() => { setFormData((p) => ({ ...p, jerseySize: s.value })); setError(""); }}
+                      title={s.label}
+                      className={`relative py-3 rounded-2xl border text-center transition-all ${
+                        active
+                          ? "border-red-600 bg-red-600 text-white shadow-lg shadow-red-600/25"
+                          : "border-slate-200 bg-slate-50 text-slate-700 hover:border-red-300 hover:bg-white"
+                      }`}
+                    >
+                      <span className="block text-sm font-black">{s.value}</span>
+                      <span className={`block text-[9px] font-semibold uppercase tracking-wide ${active ? "text-red-100" : "text-slate-400"}`}>
+                        {s.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                  className="text-sm font-semibold text-red-600"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="submit"
+              className="w-full bg-slate-950 hover:bg-red-600 text-white rounded-2xl py-4 px-6 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-red-600/25 active:scale-[0.99]"
+            >
+              <PlusCircle size={17} />
+              Add to roster
+            </button>
+          </motion.form>
+
+          {/* ================= SIZE BREAKDOWN ================= */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.22 }}
+            className="lg:col-span-2 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 p-6 md:p-8"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-red-50 border border-red-100">
+                  <Shirt size={18} className="text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-extrabold tracking-tight">Kit order</h2>
+                  <p className="text-xs text-slate-400">Jerseys needed per size</p>
+                </div>
               </div>
             </div>
 
-            {/* Action Submit */}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-slate-950 hover:bg-red-600 text-white rounded-2xl py-3.5 px-6 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-red-600/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? <Loader2 size={16} className="animate-spin" /> : <PlusCircle size={16} />}
-              {submitting ? "Saving…" : "Deploy to Roster"}
-            </button>
-          </form>
-          {formError && (
-            <p role="alert" className="mt-4 flex items-center gap-2 text-xs font-bold text-red-600">
-              <AlertCircle size={14} /> {formError}
-            </p>
-          )}
+            <div className="space-y-3.5">
+              {sizeCounts.map((s, i) => (
+                <div key={s.value} className="flex items-center gap-3">
+                  <span className="w-11 text-xs font-black text-slate-700">{s.value}</span>
+                  <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden">
+                    <motion.div
+                      initial={false}
+                      animate={{ width: `${(s.count / maxSize) * 100}%` }}
+                      transition={{ duration: 0.6, delay: i * 0.03 }}
+                      className="h-full rounded-full bg-gradient-to-r from-red-500 to-rose-500"
+                    />
+                  </div>
+                  <span className="w-6 text-right text-sm font-bold text-slate-800 tabular-nums">{s.count}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-sm text-slate-500">Total jerseys</span>
+              <span className="text-2xl font-black text-slate-900 tabular-nums">{employees.length}</span>
+            </div>
+          </motion.div>
         </div>
 
-        {/* DATA VISUALIZATION TABLE */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-4">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Allocated Profiles ({entries.length})</span>
+        {/* ================= ROSTER ================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden"
+        >
+          {/* Toolbar */}
+          <div className="p-5 md:p-6 border-b border-slate-100 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-extrabold tracking-tight">Roster</h2>
+                <p className="text-xs text-slate-400">
+                  Showing {filtered.length} of {employees.length} players
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <label className="relative flex-1 md:w-64">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search players…"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-300 focus:ring-4 focus:ring-red-100 transition"
+                  />
+                </label>
+                <button
+                  onClick={exportCSV}
+                  disabled={employees.length === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:border-red-300 hover:text-red-600 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  <Download size={15} /> <span className="hidden sm:inline">Export CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {employees.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {["All", ...Object.keys(eventCounts)].map((ev) => (
+                  <button
+                    key={ev}
+                    onClick={() => setEventFilter(ev)}
+                    className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      eventFilter === ev
+                        ? "bg-red-600 text-white border-red-600 shadow-md shadow-red-600/20"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-red-200 hover:text-red-600"
+                    }`}
+                  >
+                    {ev}
+                    <span className={`text-[10px] px-1.5 rounded-full ${eventFilter === ev ? "bg-white/20" : "bg-slate-100 text-slate-400"}`}>
+                      {ev === "All" ? employees.length : eventCounts[ev]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] shadow-[0_4px_24px_rgba(0,0,0,0.01)]">
+          {/* Table */}
+          {employees.length === 0 ? (
+            <div className="py-16 px-6 text-center">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4">
+                <ShieldCheck size={28} className="text-slate-300" />
+              </div>
+              <p className="font-bold text-slate-700">No players yet</p>
+              <p className="text-sm text-slate-400 mt-1">Add your first player using the form above.</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-12 text-center text-sm text-slate-400">No players match your search.</p>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50">
-                    <th className="py-5 px-8 text-[9px] font-black text-slate-400 uppercase tracking-widest">Employee Profile</th>
-                    <th className="py-5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Jersey Fit</th>
-                    <th className="py-5 px-6 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Added</th>
-                    <th className="py-5 px-8 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-100">
+                    <th className="py-3.5 px-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Player</th>
+                    <th className="py-3.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Event</th>
+                    <th className="py-3.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Jersey</th>
+                    <th className="py-3.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Added</th>
+                    <th className="py-3.5 px-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr>
-                      <td colSpan="4" className="py-12 text-center">
-                        <Loader2 size={24} className="mx-auto text-slate-300 animate-spin mb-2" />
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Loading roster…</p>
-                      </td>
-                    </tr>
-                  ) : loadError ? (
-                    <tr>
-                      <td colSpan="4" className="py-12 text-center">
-                        <AlertCircle size={28} className="mx-auto text-red-300 mb-2" />
-                        <p className="text-xs font-bold text-red-600">{loadError}</p>
-                        <button
-                          type="button"
-                          onClick={retryLoad}
-                          className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600"
-                        >
-                          <RefreshCw size={12} /> Retry
-                        </button>
-                      </td>
-                    </tr>
-                  ) : entries.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="py-12 text-center">
-                        <ShieldCheck size={32} className="mx-auto text-slate-200 mb-2" />
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">No Personnel Enrolled Currently</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    entries.map((entry) => (
-                      <tr key={entry._id} className="hover:bg-red-50/10 transition-colors group">
-                        <td className="py-5 px-8">
-                          <span className="text-md font-black text-slate-800 uppercase italic tracking-tight group-hover:text-red-600 transition-colors">
-                            {entry.name}
+                <tbody className="divide-y divide-slate-100">
+                  <AnimatePresence initial={false}>
+                    {filtered.map((emp) => (
+                      <motion.tr
+                        key={emp.id}
+                        layout
+                        initial={{ opacity: 0, backgroundColor: "#fef2f2" }}
+                        animate={{ opacity: 1, backgroundColor: "#ffffff" }}
+                        exit={{ opacity: 0, x: 30 }}
+                        transition={{ duration: 0.35 }}
+                        className="group hover:!bg-red-50/40"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorFor(emp.name)} text-white text-sm font-black flex items-center justify-center shadow-md`}>
+                              {initials(emp.name)}
+                            </div>
+                            <span className="text-sm font-bold text-slate-800 group-hover:text-red-600 transition-colors">{emp.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">
+                            <Trophy size={12} className="text-red-500" /> {emp.event}
                           </span>
                         </td>
-                        <td className="py-5 px-6 text-center">
-                          <span className="inline-block px-3 py-1 bg-slate-100 rounded-lg text-xs font-black italic text-slate-700 tracking-wide border border-slate-200/40">
-                            {entry.jerseySize || "—"}
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[44px] px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs font-black">
+                            {emp.jerseySize}
                           </span>
                         </td>
-                        <td className="py-5 px-6 text-center text-xs font-bold text-slate-400">
-                          {formatTimestamp(entry.createdAt)}
+                        <td className="py-4 px-4 text-center">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                            <Clock size={12} /> {emp.registrationTime}
+                          </span>
                         </td>
-                        <td className="py-5 px-8 text-right">
+                        <td className="py-4 px-6 text-right">
                           <button
-                            onClick={() => handleDelete(entry._id)}
-                            disabled={deletingId === entry._id}
-                            className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all disabled:opacity-50"
-                            title="Remove Employee"
-                            aria-label={`Remove ${entry.name}`}
+                            onClick={() => handleDelete(emp.id)}
+                            className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            title="Remove player"
+                            aria-label={`Remove ${emp.name}`}
                           >
-                            {deletingId === entry._id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            <Trash2 size={16} />
                           </button>
                         </td>
-                      </tr>
-                    ))
-                  )}
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-
+          )}
+        </motion.div>
       </div>
+
+      {/* ================= TOAST ================= */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 30, x: "-50%" }}
+            className="fixed bottom-6 left-1/2 z-50 flex items-center gap-3 pl-4 pr-2 py-2 rounded-2xl bg-slate-900 text-white shadow-2xl"
+          >
+            {toast.type === "added" ? (
+              <>
+                <CheckCircle2 size={18} className="text-emerald-400" />
+                <span className="text-sm font-medium pr-3">
+                  <b>{toast.emp.name}</b> added · {toast.emp.event} · {toast.emp.jerseySize}
+                </span>
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} className="text-red-400" />
+                <span className="text-sm font-medium">
+                  <b>{toast.emp.name}</b> removed
+                </span>
+                <button
+                  onClick={handleUndo}
+                  className="ml-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-semibold transition-colors"
+                >
+                  <Undo2 size={14} /> Undo
+                </button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
+/* ================= SMALL PIECES ================= */
+const Field = ({ label, children }) => (
+  <div className="space-y-2">
+    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</label>
+    {children}
+  </div>
+);
+
+const StatCard = ({ icon: Icon, label, value, sub, tone, i }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: i * 0.07 }}
+    className="bg-white rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/40 p-5 flex items-center gap-4"
+  >
+    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${tone}`}>
+      <Icon size={20} />
+    </div>
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-2xl font-black tracking-tight text-slate-900 truncate">{value}</p>
+      {sub && <p className="text-xs text-slate-400">{sub}</p>}
+    </div>
+  </motion.div>
+);
 
 export default ClientRelationship;
