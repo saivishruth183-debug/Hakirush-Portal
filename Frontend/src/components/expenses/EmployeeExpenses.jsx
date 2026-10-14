@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { Plus, Receipt, CheckCircle, Clock, XCircle, ArrowUpRight, FileText, Image as ImageIcon } from "lucide-react";
+import { Plus, Receipt, CheckCircle, Clock, XCircle, ArrowUpRight, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import { apiErrorMessage, authHeaders } from "../../utils/apiError";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "";
@@ -113,6 +113,21 @@ const EmployeeExpenses = () => {
     }
   };
 
+  const handleDelete = async (claimId) => {
+    if (!window.confirm("Are you sure you want to delete this expense claim? This cannot be undone.")) return;
+    try {
+      const res = await axios.delete(`${BACKEND}/api/expenses/${claimId}`, {
+        headers: authHeaders(),
+      });
+      if (res.data.success) {
+        setSuccessMsg("Expense claim deleted successfully.");
+        fetchClaims();
+      }
+    } catch (err) {
+      alert(apiErrorMessage(err, "Failed to delete expense claim"));
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case "Approved":
@@ -213,6 +228,7 @@ const EmployeeExpenses = () => {
                   <th className="py-3 px-4">Amount</th>
                   <th className="py-3 px-4">Receipt</th>
                   <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -240,6 +256,19 @@ const EmployeeExpenses = () => {
                       )}
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">{getStatusBadge(c.status)}</td>
+                    <td className="py-3 px-4 whitespace-nowrap text-right">
+                      {c.status !== "Reimbursed" ? (
+                        <button
+                          onClick={() => handleDelete(c._id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                          title="Delete this claim"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">Locked</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,14 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   AppText,
   Button,
   Card,
+  confirm,
   Divider,
-  EmptyState,
-  FormSection,
   Icon,
   LoadingState,
   Screen,
@@ -99,6 +98,28 @@ export function EmployeeOvertimeScreen() {
     }
   };
 
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+
+  const handleWithdrawRequest = async (request: OvertimeRequestItem) => {
+    const confirmed = await confirm({
+      title: 'Withdraw Overtime Request?',
+      message: `Withdraw your ${request.hours}h ${request.type} request? The hours will be returned to your available overtime balance.`,
+      confirmLabel: 'Withdraw',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      setWithdrawingId(request._id);
+      await api.delete(`/api/overtime/${request._id}`);
+      await queryClient.invalidateQueries({ queryKey: keys.overtimeSummary() });
+      toast.success('Overtime request withdrawn successfully.');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to withdraw request.'));
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
+
   return (
     <Screen scroll={true} padded={false}>
       {query.isPending && !data ? (
@@ -159,7 +180,30 @@ export function EmployeeOvertimeScreen() {
                         <AppText variant="caption" style={{ marginTop: 2 }}>{r.reason}</AppText>
                       ) : null}
                     </View>
-                    <StatusPill label={r.status} tone={requestStatusTone(r.status)} />
+                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                      <StatusPill label={r.status} tone={requestStatusTone(r.status)} />
+                      {canWrite && r.status === 'Pending' ? (
+                        <Pressable
+                          onPress={() => handleWithdrawRequest(r)}
+                          disabled={withdrawingId === r._id}
+                          style={[
+                            styles.withdrawBtn,
+                            {
+                              borderColor: theme.colors.dangerBg,
+                              backgroundColor: theme.colors.dangerBg,
+                              opacity: withdrawingId === r._id ? 0.6 : 1,
+                            },
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel="Withdraw request"
+                        >
+                          <Icon name="trash-outline" size={13} color={theme.colors.danger} />
+                          <AppText variant="caption" style={{ color: theme.colors.danger, fontWeight: '600' }}>
+                            {withdrawingId === r._id ? 'Withdrawing…' : 'Withdraw'}
+                          </AppText>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
               ))
@@ -313,5 +357,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  withdrawBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
   },
 });

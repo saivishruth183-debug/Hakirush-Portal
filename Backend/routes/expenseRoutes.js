@@ -6,6 +6,7 @@ import {
   getApprovedReimbursementsForEmployee,
   getAllExpenseClaims,
   reviewExpenseClaim,
+  deleteExpenseClaim,
 } from "../controllers/expenseController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import authorizeRoles, { requireEmployee, requireAdmin } from "../middleware/roleMiddleware.js";
@@ -22,5 +23,6 @@ router.get("/me", authMiddleware, requireEmployee, getMyExpenseClaims);
 router.get("/employee/:employeeId/approved", authMiddleware, requireAdmin, getApprovedReimbursementsForEmployee);
 router.get("/", authMiddleware, authorizeRoles("admin", "employee"), getAllExpenseClaims);
 router.put("/:id/review", authMiddleware, authorizeRoles("admin", "employee"), reviewExpenseClaim);
+router.delete("/:id", authMiddleware, authorizeRoles("admin", "employee"), deleteExpenseClaim);
 
 export default router;

@@ -204,3 +204,26 @@ export const reviewOvertimeRequest = asyncHandler(async (req, res) => {
 
   return res.json({ success: true, request });
 });
+
+/* ================= EMPLOYEE / ADMIN: DELETE (WITHDRAW) OVERTIME REQUEST ================= */
+export const deleteOvertimeRequest = asyncHandler(async (req, res) => {
+  const requestId = requireObjectId(req.params.id, "id");
+
+  const request = await OvertimeRequest.findById(requestId);
+  if (!request) throw notFound("Overtime request not found");
+
+  // Authorization: admin can delete any request; employees can only delete their own
+  if (req.user.role !== "admin") {
+    const employee = await getEmployeeForUser(req.user._id);
+    if (request.employeeId.toString() !== employee._id.toString()) {
+      throw forbidden("You can only delete your own overtime requests");
+    }
+  }
+
+  await OvertimeRequest.findByIdAndDelete(requestId);
+
+  return res.json({
+    success: true,
+    message: "Overtime request deleted successfully",
+  });
+});

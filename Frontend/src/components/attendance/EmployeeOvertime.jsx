@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Clock, CheckCircle, Plus, Calendar, DollarSign, Award, XCircle } from "lucide-react";
+import { Clock, CheckCircle, Plus, Calendar, DollarSign, Award, XCircle, Trash2 } from "lucide-react";
 import { apiErrorMessage, authHeaders } from "../../utils/apiError";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "";
@@ -65,6 +65,21 @@ const EmployeeOvertime = () => {
       setError(apiErrorMessage(err, "Failed to submit request"));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (requestId) => {
+    if (!window.confirm("Are you sure you want to withdraw this overtime request? This cannot be undone.")) return;
+    try {
+      const res = await axios.delete(`${BACKEND}/api/overtime/${requestId}`, {
+        headers: authHeaders(),
+      });
+      if (res.data.success) {
+        setMsg("Overtime request withdrawn successfully.");
+        fetchData();
+      }
+    } catch (err) {
+      alert(apiErrorMessage(err, "Failed to withdraw overtime request"));
     }
   };
 
@@ -190,6 +205,13 @@ const EmployeeOvertime = () => {
                   }`}>
                     {r.status}
                   </span>
+                  <button
+                    onClick={() => handleDelete(r._id)}
+                    className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                    title="Withdraw this request"
+                  >
+                    <Trash2 size={11} /> Withdraw
+                  </button>
                 </div>
               ))}
             </div>

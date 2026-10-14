@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { AppText, Button, Card, EmptyState, Icon, LoadingState, Screen, StatusPill, type StatusPillProps } from '@/components';
-import { useApiQuery } from '@/services/hooks';
+import { AppText, Button, Card, confirm, EmptyState, Icon, LoadingState, Screen, StatusPill, toast, type StatusPillProps } from '@/components';
+import { api, getErrorMessage } from '@/services/api';
+import { useApiMutation, useApiQuery } from '@/services/hooks';
 import { useQueryKeys } from '@/services/queryKeys';
 import { useSession } from '@/services/session';
 import { useTheme } from '@/theme';
@@ -38,6 +39,35 @@ export function EmployeeExpensesScreen() {
   const query = useApiQuery<ExpensesResponse>(keys.expenses(), '/api/expenses/me');
   const claims = query.data?.claims ?? [];
   const filtered = claims.filter((c) => filter === 'All' || c.status === filter);
+
+  const deleteMutation = useApiMutation(
+    (claimId: string) => api.delete<{ success: boolean; message: string }>(`/api/expenses/${claimId}`),
+    {
+      invalidate: [keys.expenses()],
+      onSuccess: () => {
+        toast.success('Expense claim deleted successfully.');
+      },
+    },
+  );
+
+  const handleDelete = async (claim: ExpenseClaimItem) => {
+    if (claim.status === 'Reimbursed') {
+      toast.error('Reimbursed claims cannot be deleted.');
+      return;
+    }
+    const confirmed = await confirm({
+      title: 'Delete Expense Claim?',
+      message: `Are you sure you want to delete "${claim.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteMutation.mutateAsync(claim._id);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to delete expense claim.'));
+    }
+  };
 
   const totalClaimed = claims.reduce((s, c) => s + (c.amount || 0), 0);
   const totalApproved = claims
@@ -117,7 +147,14 @@ export function EmployeeExpensesScreen() {
           keyExtractor={(c) => c._id}
           ListHeaderComponent={header}
           contentContainerStyle={{ gap: theme.spacing.md, paddingBottom: theme.spacing.xl }}
-          renderItem={({ item }) => <ExpenseCard claim={item} />}
+          renderItem={({ item }) => (
+            <ExpenseCard
+              claim={item}
+              canDelete={canWrite && item.status !== 'Reimbursed'}
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === item._id}
+              onDelete={() => handleDelete(item)}
+            />
+          )}
           ListEmptyComponent={
             <EmptyState
               title={filter === 'All' ? 'No expense claims yet' : `No ${filter.toLowerCase()} claims`}
@@ -130,7 +167,17 @@ export function EmployeeExpensesScreen() {
   );
 }
 
-function ExpenseCard({ claim }: { claim: ExpenseClaimItem }) {
+function ExpenseCard({
+  claim,
+  canDelete,
+  isDeleting,
+  onDelete,
+}: {
+  claim: ExpenseClaimItem;
+  canDelete: boolean;
+  isDeleting: boolean;
+  onDelete: () => void;
+}) {
   const theme = useTheme();
 
   const openReceipt = () => {
@@ -155,17 +202,40 @@ function ExpenseCard({ claim }: { claim: ExpenseClaimItem }) {
         <AppText variant="title" style={{ color: theme.colors.primary }}>
           {formatCurrency(claim.amount)}
         </AppText>
-        {claim.receiptUrl ? (
-          <Pressable
-            onPress={openReceipt}
-            style={[styles.receiptBtn, { borderColor: theme.colors.border }]}
-            accessibilityRole="button"
-            accessibilityLabel="View receipt attachment"
-          >
-            <Icon name="document-attach-outline" size={16} color={theme.colors.primary} />
-            <AppText variant="label" color="primary">Receipt</AppText>
-          </Pressable>
-        ) : null}
+        <View style={styles.actionButtonsRow}>
+          {claim.receiptUrl ? (
+            <Pressable
+              onPress={openReceipt}
+              style={[styles.receiptBtn, { borderColor: theme.colors.border }]}
+              accessibilityRole="button"
+              accessibilityLabel="View receipt attachment"
+            >
+              <Icon name="document-attach-outline" size={16} color={theme.colors.primary} />
+              <AppText variant="label" color="primary">Receipt</AppText>
+            </Pressable>
+          ) : null}
+          {canDelete ? (
+            <Pressable
+              onPress={onDelete}
+              disabled={isDeleting}
+              style={[
+                styles.deleteBtn,
+                {
+                  borderColor: theme.colors.dangerBg,
+                  backgroundColor: theme.colors.dangerBg,
+                  opacity: isDeleting ? 0.6 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete claim ${claim.title}`}
+            >
+              <Icon name="trash-outline" size={15} color={theme.colors.danger} />
+              <AppText variant="label" style={{ color: theme.colors.danger }}>
+                {isDeleting ? 'Deleting…' : 'Delete'}
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {claim.description ? (
@@ -230,7 +300,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 4,
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   receiptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

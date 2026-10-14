@@ -212,3 +212,34 @@ export const reviewExpenseClaim = asyncHandler(async (req, res) => {
 
   return res.json({ success: true, claim });
 });
+
+/* ================= EMPLOYEE / ADMIN: DELETE (WITHDRAW) EXPENSE CLAIM ================= */
+export const deleteExpenseClaim = asyncHandler(async (req, res) => {
+  const claimId = requireObjectId(req.params.id, "id");
+
+  const claim = await ExpenseClaim.findById(claimId);
+  if (!claim) throw notFound("Expense claim not found");
+
+  // Reimbursed claims are locked — they are already credited in payroll
+  if (claim.status === "Reimbursed") {
+    throw conflict(
+      "Cannot delete a claim that has already been reimbursed in payroll",
+      "ALREADY_REIMBURSED"
+    );
+  }
+
+  // Authorization: admin can delete any non-reimbursed claim; employees can only delete their own
+  if (req.user.role !== "admin") {
+    const employee = await getEmployeeForUser(req.user._id);
+    if (claim.employeeId.toString() !== employee._id.toString()) {
+      throw forbidden("You can only delete your own expense claims");
+    }
+  }
+
+  await ExpenseClaim.findByIdAndDelete(claimId);
+
+  return res.json({
+    success: true,
+    message: "Expense claim deleted successfully",
+  });
+});

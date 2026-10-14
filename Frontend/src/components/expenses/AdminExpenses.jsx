@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Receipt, Check, X, Clock, CheckCircle, ArrowUpRight, XCircle, Image as ImageIcon, Filter } from "lucide-react";
+import { Receipt, Check, X, Clock, CheckCircle, ArrowUpRight, XCircle, Image as ImageIcon, Filter, Trash2 } from "lucide-react";
 import { apiErrorMessage, authHeaders } from "../../utils/apiError";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "";
@@ -46,6 +46,24 @@ const AdminExpenses = () => {
       }
     } catch (err) {
       alert(apiErrorMessage(err, `Failed to ${decision.toLowerCase()} claim`));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDelete = async (claimId) => {
+    if (!window.confirm("Are you sure you want to delete this expense claim? This cannot be undone.")) return;
+    try {
+      setActionLoading(claimId);
+      const res = await axios.delete(`${BACKEND}/api/expenses/${claimId}`, {
+        headers: authHeaders(),
+      });
+      if (res.data.success) {
+        setMsg("Expense claim deleted successfully.");
+        fetchClaims();
+      }
+    } catch (err) {
+      alert(apiErrorMessage(err, "Failed to delete expense claim"));
     } finally {
       setActionLoading(null);
     }
@@ -198,9 +216,25 @@ const AdminExpenses = () => {
                             >
                               <X size={12} /> Reject
                             </button>
+                            <button
+                              disabled={actionLoading === c._id}
+                              onClick={() => handleDelete(c._id)}
+                              className="p-1 text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              title="Delete claim"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
-                        ) : (
+                        ) : c.status === "Reimbursed" ? (
                           <span className="text-xs text-gray-400">Locked</span>
+                        ) : (
+                          <button
+                            disabled={actionLoading === c._id}
+                            onClick={() => handleDelete(c._id)}
+                            className="px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md flex items-center gap-1 transition-colors"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
                         )}
                       </td>
                     </tr>
