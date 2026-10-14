@@ -147,10 +147,7 @@ const LeaveDetails = () => {
       );
 
       if (response.data?.success) {
-        setLeave(response.data.leave);
         setAlertType(status.toLowerCase());
-      } else {
-        throw new Error(response.data?.message || "Failed to update status");
       }
     } catch (error) {
       alert(error?.response?.data?.error || "Failed to update status");
