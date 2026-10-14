@@ -4,7 +4,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import { startTestDb, stopTestDb, clearDb, getApp, seedFixtures, auth } from "./helpers/testEnv.js";
 
-let app, fx, Notification, Announcement, Stall, businessDate, addDays;
+let app, fx, Notification, Announcement, Stall, Leave, businessDate, addDays;
 
 before(async () => {
   await startTestDb();
@@ -12,6 +12,7 @@ before(async () => {
   Notification = (await import("../models/Notification.js")).default;
   Announcement = (await import("../models/Announcement.js")).default;
   Stall = (await import("../models/Stall.js")).default;
+  Leave = (await import("../models/Leave.js")).default;
   ({ businessDate, addDays } = await import("../utils/orgTime.js"));
 });
 after(async () => { await stopTestDb(); });
@@ -111,6 +112,41 @@ describe("dashboard", () => {
     const r = await request(app).get("/api/dashboard/summary").set(asAdmin());
     assert.equal(r.status, 200);
     assert.equal(r.body.totalEmployees, 7);
+  });
+
+  test("leave summary excludes orphaned requests and reflects resolved pending requests", async () => {
+    const leaveData = {
+      leaveType: "Casual Leave",
+      startDate: new Date("2026-10-15T00:00:00Z"),
+      endDate: new Date("2026-10-15T00:00:00Z"),
+      days: 1,
+    };
+    const pending = await Leave.create({
+      ...leaveData,
+      employeeId: fx.itDev1.employee._id,
+      status: "Pending",
+    });
+    await Leave.create({
+      ...leaveData,
+      employeeId: new mongoose.Types.ObjectId(),
+      status: "Pending",
+    });
+    await Leave.create({
+      ...leaveData,
+      employeeId: fx.itDev2.employee._id,
+      status: "Approved",
+    });
+
+    const firstSummary = await request(app).get("/api/dashboard/summary").set(asAdmin());
+    assert.equal(firstSummary.status, 200);
+    assert.equal(firstSummary.body.leaveSummary.appliedFor, 2);
+    assert.equal(firstSummary.body.leaveSummary.pending, 1);
+    assert.equal(firstSummary.body.leaveSummary.approved, 1);
+
+    await Leave.updateOne({ _id: pending._id }, { $set: { status: "Cancelled" } });
+    const resolvedSummary = await request(app).get("/api/dashboard/summary").set(asAdmin());
+    assert.equal(resolvedSummary.status, 200);
+    assert.equal(resolvedSummary.body.leaveSummary.pending, 0);
   });
 });
 
