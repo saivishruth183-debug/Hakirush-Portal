@@ -134,36 +134,36 @@ const ManagerOption = ({ selected, onClick, title, subtitle, badge, tone = "defa
     onClick={onClick}
     role="radio"
     aria-checked={selected}
-    className={`group flex w-full items-center gap-3 rounded-2xl p-3 text-left ring-1 transition ${
+    className={`group flex w-full min-w-0 items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors ${
       selected
-        ? "bg-red-50/70 ring-2 ring-red-400"
+        ? "border-red-300 bg-red-50"
         : tone === "warning"
-        ? "bg-amber-50/50 ring-amber-200 hover:ring-amber-300"
-        : "bg-white ring-gray-200 hover:bg-gray-50 hover:ring-red-200"
+        ? "border-amber-200 bg-amber-50/60 hover:border-amber-300"
+        : "border-gray-200 bg-white hover:border-red-200 hover:bg-red-50/40"
     }`}
   >
     {Icon ? (
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone === "warning" ? "bg-amber-100 text-amber-600" : "bg-gray-100 text-gray-400"}`}>
-        <Icon size={18} />
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone === "warning" ? "bg-amber-100 text-amber-600" : "bg-gray-100 text-gray-400"}`}>
+        <Icon size={15} />
       </span>
     ) : (
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xs font-bold text-white shadow-md ${colorFor(avatarText)}`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-[11px] font-bold text-white ${colorFor(avatarText)}`}>
         {initials(avatarText)}
       </span>
     )}
     <span className="min-w-0 flex-1">
-      <span className="flex items-center gap-2">
-        <span className="truncate text-sm font-bold text-gray-900">{title}</span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="truncate text-[13px] font-semibold text-gray-900">{title}</span>
         {badge}
       </span>
-      {subtitle && <span className="block truncate text-xs text-gray-500">{subtitle}</span>}
+      {subtitle && <span className="block truncate text-[11px] text-gray-500">{subtitle}</span>}
     </span>
     <span
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ring-2 transition ${
-        selected ? "bg-gradient-to-br from-red-600 to-rose-500 ring-red-500" : "bg-white ring-gray-300 group-hover:ring-red-300"
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        selected ? "border-red-500 bg-red-500" : "border-gray-300 bg-white group-hover:border-red-300"
       }`}
     >
-      {selected && <span className="h-2 w-2 rounded-full bg-white" />}
+      {selected && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
     </span>
   </button>
 );
@@ -476,8 +476,8 @@ const EditDepartment = () => {
                     </Field>
 
                     {/* manager picker */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
+                    <div className="space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <label className="flex items-center gap-2 text-sm font-bold text-gray-900">
                           <UserCog size={16} className="text-red-500" /> Department manager
                           {managerChanged && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">Edited</span>}
@@ -486,7 +486,7 @@ const EditDepartment = () => {
                       </div>
 
                       {eligibleState.loading ? (
-                        <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
+                        <div className="space-y-1.5 rounded-2xl bg-gray-50/70 p-1.5"><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-12 w-full rounded-xl" /></div>
                       ) : (
                         <>
                           {eligibleState.error && (
@@ -507,7 +507,7 @@ const EditDepartment = () => {
                             </label>
                           )}
 
-                          <div role="radiogroup" aria-label="Department manager" className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                          <div role="radiogroup" aria-label="Department manager" className="max-h-[260px] space-y-1.5 overflow-y-auto overflow-x-hidden rounded-2xl bg-gray-50/70 p-1.5 ring-1 ring-gray-100">
                             <ManagerOption
                               selected={managerId === ""}
                               onClick={() => setManagerId("")}
@@ -524,7 +524,7 @@ const EditDepartment = () => {
                                 subtitle={currentManager ? managerLabel(currentManager) : "No longer eligible"}
                                 tone="warning"
                                 icon={AlertTriangle}
-                                badge={<span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">No longer eligible</span>}
+                                badge={<span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-700">Not eligible</span>}
                               />
                             )}
 
@@ -540,8 +540,8 @@ const EditDepartment = () => {
                                   avatarText={m.name || "?"}
                                   badge={
                                     mid === originalManagerId ? (
-                                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-2 py-0.5 text-[10px] font-bold text-white">
-                                        <Star size={9} fill="currentColor" /> Current
+                                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-700">
+                                        <Star size={8} fill="currentColor" /> Current
                                       </span>
                                     ) : null
                                   }
