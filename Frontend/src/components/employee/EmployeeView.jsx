@@ -1,288 +1,527 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Calendar, ChevronLeft, Fingerprint, Mail,
-  Droplets, Briefcase, IdCard, CreditCard,
-  PiggyBank, Heart, User, Edit, Globe, X
+  Calendar, ChevronLeft, ChevronRight, Fingerprint, Mail, Droplets, Briefcase, IdCard, CreditCard,
+  PiggyBank, Heart, User, Pencil, Building2, X, Copy, Check, Eye, EyeOff, Cake, Clock,
+  IndianRupee, AlertTriangle, RefreshCw, ShieldCheck, Users, ZoomIn, Wallet, BadgeCheck,
 } from "lucide-react";
 
-/* ================= DESIGN TOKENS ================= */
-/* Same palette + type system as the Admin and Employee dashboards,
-   so this page reads as the same product, not a third visual identity. */
-const INK = "#1C1A17";
-const GARNET = "#7A2233";
-const GOLD = "#C6A15B";
-const HAIRLINE = "#E7DFD2";
-const CREAM = "#FBF8F3";
-const SAGE = "#3F5B54";
-const SLATE = "#4A5A6B";
+const PAGE_BG = "bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)]";
 
-const displayFont = { fontFamily: "'Playfair Display', 'Georgia', serif" };
-const bodyFont = { fontFamily: "'Inter', 'Helvetica Neue', sans-serif" };
+const avatarColors = [
+  "from-red-500 to-rose-600",
+  "from-sky-500 to-blue-600",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-orange-600",
+  "from-violet-500 to-purple-600",
+  "from-slate-600 to-slate-800",
+];
+const colorFor = (s = "") => avatarColors[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % avatarColors.length];
 
-const GRAIN_URI =
-  "data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='140'%20height='140'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.85'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3C/filter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23n)'%20opacity='0.5'/%3E%3C/svg%3E";
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith("http")) return imagePath;
+  return `${import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "")}/${imagePath.replace(/^\/+/, "")}`;
+};
 
-const CornerTicks = ({ color = GOLD }) => (
-  <>
-    <span className="pointer-events-none absolute top-4 left-4 h-2.5 w-2.5 border-t border-l opacity-70" style={{ borderColor: color }} />
-    <span className="pointer-events-none absolute top-4 right-4 h-2.5 w-2.5 border-t border-r opacity-70" style={{ borderColor: color }} />
-  </>
+/* ---------- date helpers (never print "Invalid Date") ---------- */
+const toDate = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+};
+const fmtDate = (v) => {
+  const d = toDate(v);
+  return d ? d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "";
+};
+const ageFrom = (v) => {
+  const d = toDate(v);
+  if (!d) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
+  return age >= 0 ? age : null;
+};
+const tenureFrom = (v) => {
+  const d = toDate(v);
+  if (!d) return "";
+  const now = new Date();
+  let months = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  if (now.getDate() < d.getDate()) months--;
+  if (months < 0) return "";
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (!y && !m) return "Joined this month";
+  return [y && `${y} yr${y > 1 ? "s" : ""}`, m && `${m} mo`].filter(Boolean).join(" ");
+};
+const daysToBirthday = (v) => {
+  const d = toDate(v);
+  if (!d) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const next = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+  if (next < today) next.setFullYear(today.getFullYear() + 1);
+  return Math.round((next - today) / 86400000);
+};
+
+const mask = (value, keep = 4) => {
+  const s = String(value || "");
+  if (!s) return "";
+  if (s.length <= keep) return s;
+  return "•".repeat(Math.min(s.length - keep, 8)) + s.slice(-keep);
+};
+
+/* ================= SMALL PIECES ================= */
+const CopyButton = ({ value, label }) => {
+  const [copied, setCopied] = useState(false);
+  if (!value) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => { navigator.clipboard?.writeText(String(value)); setCopied(true); setTimeout(() => setCopied(false), 1400); }}
+      aria-label={`Copy ${label}`}
+      title={`Copy ${label}`}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${
+        copied ? "bg-emerald-50 text-emerald-600" : "text-gray-300 hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+      }`}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  );
+};
+
+const InfoRow = ({ icon: Icon, label, value, sub, copy, mono, sensitive, revealed }) => (
+  <div className="group flex items-center gap-3 rounded-2xl p-3 transition hover:bg-red-50/50">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+      <Icon size={17} />
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="text-[11px] font-medium text-gray-400">{label}</p>
+      {value ? (
+        <p className={`truncate text-sm font-semibold text-gray-900 ${mono ? "font-mono tracking-wide" : ""}`}>
+          {sensitive && !revealed ? mask(value) : value}
+        </p>
+      ) : (
+        <p className="text-sm font-medium text-gray-300">Not provided</p>
+      )}
+      {sub && value && <p className="truncate text-[11px] text-gray-400">{sub}</p>}
+    </div>
+    {copy && value && (!sensitive || revealed) && <CopyButton value={value} label={label} />}
+  </div>
 );
 
+const Card = ({ icon: Icon, title, right, children, i = 0, className = "" }) => (
+  <motion.section
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0, transition: { delay: 0.12 + i * 0.06, duration: 0.45 } }}
+    className={`overflow-hidden rounded-3xl bg-white/90 shadow-[0_14px_40px_-18px_rgba(127,29,29,0.2)] ring-1 ring-white/70 backdrop-blur-sm ${className}`}
+  >
+    <div className="flex items-center justify-between gap-3 border-b border-red-50 px-5 py-4">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-md shadow-red-600/25">
+          <Icon size={15} />
+        </span>
+        <h3 className="text-sm font-extrabold tracking-tight text-gray-900">{title}</h3>
+      </div>
+      {right}
+    </div>
+    <div className="p-2 sm:p-3">{children}</div>
+  </motion.section>
+);
+
+const Stat = ({ icon: Icon, label, value, tone }) => (
+  <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3.5 ring-1 ring-white/70">
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+      <Icon size={17} />
+    </span>
+    <div className="min-w-0">
+      <p className="truncate text-base font-extrabold leading-tight text-gray-900">{value || "—"}</p>
+      <p className="text-[11px] font-medium text-gray-500">{label}</p>
+    </div>
+  </div>
+);
+
+const Skeleton = ({ className = "" }) => <div className={`animate-pulse rounded-2xl bg-white/70 ${className}`} />;
+
+/* ================= PAGE ================= */
 const EmployeeView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [isImageOpen, setIsImageOpen] = useState(false);
+  const [imgBroken, setImgBroken] = useState(false);
+  const [showSensitive, setShowSensitive] = useState(false);
+  const [showSalary, setShowSalary] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const fetchEmployee = async () => {
+      setLoading(true);
+      setLoadError("");
       try {
         const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/employee/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         if (res.data?.success) setEmployee(res.data.employee);
-      } catch {
+        else setEmployee(null);
+      } catch (err) {
         console.error("Failed to load profile");
+        setEmployee(null);
+        if (err?.response?.status !== 404) {
+          setLoadError(err?.response?.data?.error || err?.response?.data?.message || "We couldn't load this profile. Check your connection and try again.");
+        }
       } finally {
         setLoading(false);
       }
     };
     fetchEmployee();
-  }, [id]);
+  }, [id, reloadKey]);
 
   // Close lightbox on Escape key
   useEffect(() => {
     if (!isImageOpen) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setIsImageOpen(false);
-    };
+    const onKeyDown = (e) => e.key === "Escape" && setIsImageOpen(false);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = "";
+    };
   }, [isImageOpen]);
 
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return "/default-avatar.png";
-    if (imagePath.startsWith("http")) return imagePath;
-    return `${import.meta.env.VITE_BACKEND_URL}/${imagePath.replace(/^\/+/, "")}`;
-  };
+  const name = employee?.userId?.name || "Unnamed employee";
+  const initials = useMemo(
+    () => name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase(),
+    [name]
+  );
 
-  const initials = React.useMemo(() => {
-    const name = employee?.userId?.name || "";
-    return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  }, [employee]);
+  if (loading) return <LoadingView />;
+  if (!employee) return <ErrorView message={loadError} onRetry={loadError ? () => setReloadKey((k) => k + 1) : null} onBack={() => navigate(-1)} />;
 
-  if (loading) return <LoadingPulse />;
-  if (!employee) return <ErrorView />;
-
-  const hasProfileImage = Boolean(employee?.userId?.profileImage);
+  const photo = getImageUrl(employee?.userId?.profileImage);
+  const hasPhoto = Boolean(photo) && !imgBroken;
+  const rawActive = employee.isActive ?? employee.userId?.isActive;
+  const isActive = typeof rawActive === "boolean" ? rawActive : undefined;
+  const role = employee.userId?.role;
+  const dept = employee.department;
+  const joined = toDate(employee.dateOfJoining);
+  const age = ageFrom(employee.dob);
+  const bdayIn = daysToBirthday(employee.dob);
+  const salary = Number(employee.salary || 0);
+  const hasSalary = employee.salary !== undefined && employee.salary !== null && employee.salary !== "";
+  const experience = employee.experience !== undefined && employee.experience !== null && employee.experience !== ""
+    ? `${employee.experience} ${Number(employee.experience) === 1 ? "year" : "years"}`
+    : "";
+  const docCount = [employee.aadharcard, employee.pancard, employee.pfNumber].filter(Boolean).length;
+  const editPath = `/admin-dashboard/employees/edit/${employee._id}`;
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-[#FBF8F3] via-white to-[#F3EDE0] p-4 text-[#1C1A17] lg:p-10" style={bodyFont}>
-      {/* soft ambient glow + grain, matching the rest of the dashboard */}
-      <div
-        className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[420px] opacity-70"
-        style={{
-          background:
-            "radial-gradient(60% 60% at 15% 0%, rgba(198,161,91,0.10), transparent 70%), radial-gradient(50% 50% at 100% 0%, rgba(122,34,51,0.06), transparent 70%)",
-        }}
-      />
-      <div
-        className="pointer-events-none fixed inset-0 z-0 opacity-[0.035] mix-blend-multiply"
-        style={{ backgroundImage: `url("${GRAIN_URI}")` }}
-      />
+    <div className={`min-h-screen px-4 pb-16 pt-6 font-sans text-gray-700 sm:px-8 ${PAGE_BG}`}>
+      <div className="mx-auto max-w-6xl">
+        {/* ================= TOP ROW ================= */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="mb-6 flex items-center justify-between gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="group inline-flex items-center gap-2 rounded-2xl bg-white/80 px-3.5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm ring-1 ring-red-100 transition hover:text-red-600 hover:ring-red-200"
+          >
+            <ChevronLeft size={17} className="transition-transform group-hover:-translate-x-0.5" />
+            Back
+          </button>
+          <span className="hidden items-center gap-1.5 text-xs font-medium text-gray-400 sm:flex">
+            Employees <ChevronRight size={12} />
+            <span className="max-w-[220px] truncate font-semibold text-red-600">{name}</span>
+          </span>
+        </motion.div>
 
-      <div className="relative z-10 mx-auto max-w-3xl">
-
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-8 flex cursor-pointer items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] transition-colors hover:text-[#7A2233]"
-          style={{ color: "#8A8378" }}
+        {/* ================= PROFILE HEADER ================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="overflow-hidden rounded-[2rem] bg-white/90 shadow-[0_24px_60px_-24px_rgba(127,29,29,0.35)] ring-1 ring-white/70 backdrop-blur-sm"
         >
-          <ChevronLeft size={14} strokeWidth={1.75} /> Back
-        </button>
+          {/* cover */}
+          <div className="relative h-32 overflow-hidden bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 sm:h-40">
+            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.12]"
+              style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
+            <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+            <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/4 h-48 w-48 rounded-full bg-orange-300/30 blur-3xl" />
+          </div>
 
-        <div
-          className="relative overflow-hidden rounded-[1.75rem] border bg-white/70 shadow-[0_1px_2px_rgba(28,26,23,0.04),0_40px_90px_-32px_rgba(28,26,23,0.24)] backdrop-blur-md"
-          style={{ borderColor: HAIRLINE }}
+          <div className="relative px-5 pb-6 sm:px-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-end">
+                {/* avatar */}
+                <button
+                  type="button"
+                  onClick={() => hasPhoto && setIsImageOpen(true)}
+                  disabled={!hasPhoto}
+                  aria-label={hasPhoto ? "View photo" : undefined}
+                  className={`group relative -mt-16 h-32 w-32 shrink-0 rounded-[2rem] bg-white p-1.5 shadow-xl ring-4 ring-white sm:-mt-20 sm:h-36 sm:w-36 ${hasPhoto ? "cursor-zoom-in" : "cursor-default"}`}
+                >
+                  {hasPhoto ? (
+                    <>
+                      <img src={photo} alt={name} onError={() => setImgBroken(true)}
+                        className={`h-full w-full rounded-[1.6rem] object-cover ${isActive === false ? "grayscale" : ""}`} />
+                      <span className="absolute inset-1.5 flex items-center justify-center rounded-[1.6rem] bg-gray-900/40 text-white opacity-0 transition group-hover:opacity-100">
+                        <ZoomIn size={22} />
+                      </span>
+                    </>
+                  ) : (
+                    <span className={`flex h-full w-full items-center justify-center rounded-[1.6rem] bg-gradient-to-br text-4xl font-extrabold text-white ${isActive === false ? "from-gray-300 to-gray-400" : colorFor(name)}`}>
+                      {initials || <User size={36} />}
+                    </span>
+                  )}
+                  {typeof isActive === "boolean" && (
+                    <span className={`absolute bottom-2 right-2 h-5 w-5 rounded-full ring-4 ring-white ${isActive ? "bg-emerald-500" : "bg-gray-400"}`} />
+                  )}
+                </button>
+
+                {/* name block */}
+                <div className="min-w-0 text-center sm:pb-1 sm:text-left">
+                  <h1 className="truncate text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">{name}</h1>
+                  <p className="mt-0.5 text-sm text-gray-500">
+                    {employee.designation || "Team member"}
+                    {dept?.dep_name && <> · <span className="font-semibold text-gray-700">{dept.dep_name}</span></>}
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
+                    {employee.employeeId && (
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 font-mono text-[11px] font-semibold text-gray-600">
+                        <Fingerprint size={11} /> {employee.employeeId}
+                      </span>
+                    )}
+                    {typeof isActive === "boolean" &&
+                      (isActive ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> Inactive
+                        </span>
+                      ))}
+                    {role && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold capitalize text-amber-700">
+                        <ShieldCheck size={11} /> {role}
+                      </span>
+                    )}
+                    {joined && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
+                        <BadgeCheck size={11} /> Since {joined.getFullYear()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* actions */}
+              <div className="flex flex-wrap justify-center gap-2 sm:justify-end sm:pb-1">
+                {employee.userId?.email && (
+                  <a
+                    href={`mailto:${employee.userId.email}`}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-red-100 transition hover:text-red-600 hover:ring-red-200"
+                  >
+                    <Mail size={16} /> Email
+                  </a>
+                )}
+                {dept?._id && (
+                  <button
+                    onClick={() => navigate(`/admin-dashboard/department/${dept._id}/employees`)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-red-100 transition hover:text-red-600 hover:ring-red-200"
+                  >
+                    <Users size={16} /> Team
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate(editPath)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]"
+                >
+                  <Pencil size={16} /> Edit profile
+                </button>
+              </div>
+            </div>
+
+            {/* quick stats */}
+            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Stat icon={Clock} label="Time with us" value={tenureFrom(employee.dateOfJoining)} tone="bg-red-50 text-red-600" />
+              <Stat icon={Briefcase} label="Total experience" value={experience} tone="bg-sky-50 text-sky-600" />
+              <Stat icon={Cake} label={bdayIn === 0 ? "Birthday today 🎉" : "Age"} value={age !== null ? `${age} years` : ""} tone="bg-pink-50 text-pink-600" />
+              <Stat icon={Droplets} label="Blood group" value={employee.bloodGroup} tone="bg-rose-50 text-rose-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ================= DETAILS GRID ================= */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* personal */}
+          <Card icon={User} title="Personal details" i={0}>
+            <InfoRow icon={Mail} label="Email address" value={employee.userId?.email} copy />
+            <InfoRow
+              icon={Calendar}
+              label="Date of birth"
+              value={fmtDate(employee.dob)}
+              sub={bdayIn !== null ? (bdayIn === 0 ? "Birthday is today 🎉" : `Next birthday in ${bdayIn} day${bdayIn === 1 ? "" : "s"}`) : ""}
+            />
+            <InfoRow icon={User} label="Gender" value={employee.gender} />
+            <InfoRow icon={Heart} label="Marital status" value={employee.maritalStatus} />
+            <InfoRow icon={Droplets} label="Blood group" value={employee.bloodGroup} />
+          </Card>
+
+          {/* work */}
+          <Card icon={Briefcase} title="Work details" i={1}>
+            <InfoRow icon={Fingerprint} label="Employee ID" value={employee.employeeId} mono copy />
+            <InfoRow icon={Briefcase} label="Designation" value={employee.designation} />
+            <InfoRow icon={Building2} label="Department" value={dept?.dep_name} />
+            <InfoRow icon={Calendar} label="Joined on" value={fmtDate(employee.dateOfJoining)} sub={tenureFrom(employee.dateOfJoining)} />
+            <InfoRow icon={Clock} label="Experience" value={experience} />
+          </Card>
+
+          {/* documents */}
+          <Card
+            icon={IdCard}
+            title="Identity documents"
+            i={2}
+            right={
+              docCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSensitive((v) => !v)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gray-50 px-2.5 py-1.5 text-[11px] font-bold text-gray-600 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200"
+                >
+                  {showSensitive ? <><EyeOff size={13} /> Hide</> : <><Eye size={13} /> Show</>}
+                </button>
+              )
+            }
+          >
+            <InfoRow icon={IdCard} label="Aadhaar number" value={employee.aadharcard} mono copy sensitive revealed={showSensitive} />
+            <InfoRow icon={CreditCard} label="PAN number" value={employee.pancard} mono copy sensitive revealed={showSensitive} />
+            <InfoRow icon={PiggyBank} label="PF number" value={employee.pfNumber} mono copy sensitive revealed={showSensitive} />
+            <p className="flex items-center gap-1.5 px-3 pb-2 pt-1 text-[11px] text-gray-400">
+              <ShieldCheck size={12} className="text-emerald-500" />
+              {docCount ? `${docCount} of 3 on file · hidden by default` : "No documents on file yet"}
+            </p>
+          </Card>
+        </div>
+
+        {/* ================= COMPENSATION ================= */}
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0, transition: { delay: 0.32, duration: 0.45 } }}
+          className="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-gray-900 via-gray-900 to-red-950 p-6 text-white shadow-[0_24px_60px_-20px_rgba(127,29,29,0.5)] sm:p-8"
         >
-          {/* masthead rule, matching Admin & Employee dashboards */}
-          <div className="h-[3px] w-full" style={{ background: `linear-gradient(90deg, ${GARNET}, ${GOLD} 45%, ${GARNET})` }} />
-          <CornerTicks />
+          <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-red-600/30 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-10 right-10 opacity-[0.07]"><Wallet size={160} strokeWidth={1} /></div>
 
-          {/* ============ NAMEPLATE ============ */}
-          <div className="flex flex-col items-center px-8 pb-10 pt-12 text-center sm:px-14">
-            <div
-              onClick={() => hasProfileImage && setIsImageOpen(true)}
-              className={`flex h-20 w-20 items-center justify-center rounded-full border-2 transition-transform ${hasProfileImage ? "cursor-pointer hover:scale-105" : ""}`}
-              style={{ borderColor: `${GOLD}55`, color: GOLD }}
-            >
-              {hasProfileImage ? (
-                <img
-                  src={getImageUrl(employee.userId.profileImage)}
-                  className="h-full w-full rounded-full object-cover"
-                  alt="Profile"
-                  onError={(e) => { e.target.style.display = "none"; }}
-                />
-              ) : (
-                <span className="text-lg" style={{ ...displayFont, fontWeight: 700 }}>{initials}</span>
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-red-300">
+                <IndianRupee size={13} /> Annual compensation
+              </p>
+              <p className="mt-2 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl">
+                {hasSalary ? (showSalary ? `₹${salary.toLocaleString("en-IN")}` : "₹ ••••••") : <span className="text-white/40">Not set</span>}
+              </p>
+              {hasSalary && showSalary && (
+                <p className="mt-1 text-sm text-white/60">
+                  ≈ ₹{Math.round(salary / 12).toLocaleString("en-IN")} per month
+                </p>
               )}
             </div>
-
-            <p className="mt-6 text-[9px] font-semibold uppercase tracking-[0.32em]" style={{ color: GOLD }}>
-              HAKIRUSH · Member Since {new Date(employee.dateOfJoining).getFullYear()}
-            </p>
-            <h1 className="mt-3 text-4xl leading-none sm:text-5xl tracking-tight" style={{ ...displayFont, fontWeight: 700 }}>
-              {employee?.userId?.name}
-            </h1>
-            <p className="mt-3 text-xs uppercase tracking-[0.18em]" style={{ color: "#8A8378" }}>
-              {employee?.designation || "Executive Member"} &nbsp;·&nbsp; {employee?.department?.dep_name}
-            </p>
-
-            <button
-              onClick={() => navigate(`/admin-dashboard/employees/edit/${employee._id}`)}
-              className="mt-7 flex cursor-pointer items-center gap-2 rounded-full border px-7 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] transition-colors"
-              style={{ borderColor: INK, color: INK }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = GARNET;
-                e.currentTarget.style.borderColor = GARNET;
-                e.currentTarget.style.color = "#FFFFFF";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.borderColor = INK;
-                e.currentTarget.style.color = INK;
-              }}
-            >
-              <Edit size={13} strokeWidth={1.75} /> Edit Profile
-            </button>
+            {hasSalary && (
+              <button
+                type="button"
+                onClick={() => setShowSalary((v) => !v)}
+                className="inline-flex items-center gap-2 self-start rounded-2xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/20 backdrop-blur transition hover:bg-white/20 md:self-auto"
+              >
+                {showSalary ? <><EyeOff size={16} /> Hide salary</> : <><Eye size={16} /> Show salary</>}
+              </button>
+            )}
           </div>
-
-          <GoldRule />
-
-          {/* ============ DOSSIER ============ */}
-          <div className="grid grid-cols-1 gap-x-10 gap-y-8 px-8 py-10 sm:grid-cols-2 sm:px-14">
-            <Field icon={<Fingerprint size={14} strokeWidth={1.5} />} label="Employee ID" value={employee.employeeId} />
-            <Field icon={<Mail size={14} strokeWidth={1.5} />} label="Email Address" value={employee.userId?.email} />
-            <Field icon={<Globe size={14} strokeWidth={1.5} />} label="Department" value={employee.department?.dep_name} />
-            <Field
-              icon={<Calendar size={14} strokeWidth={1.5} />}
-              label="Date of Birth"
-              value={new Date(employee.dob).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-            />
-            <Field icon={<User size={14} strokeWidth={1.5} />} label="Gender" value={employee.gender} />
-            <Field icon={<Heart size={14} strokeWidth={1.5} />} label="Marital Status" value={employee.maritalStatus} />
-            <Field icon={<Droplets size={14} strokeWidth={1.5} />} label="Blood Group" value={employee.bloodGroup} />
-            <Field icon={<Briefcase size={14} strokeWidth={1.5} />} label="Experience" value={`${employee.experience} Years`} />
-            <Field
-              icon={<Calendar size={14} strokeWidth={1.5} />}
-              label="Official Join Date"
-              value={new Date(employee.dateOfJoining).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-            />
-            <Field icon={<IdCard size={14} strokeWidth={1.5} />} label="Aadhar Card" value={employee.aadharcard} />
-            <Field icon={<CreditCard size={14} strokeWidth={1.5} />} label="PAN Card" value={employee.pancard} />
-            <Field icon={<PiggyBank size={14} strokeWidth={1.5} />} label="PF Number" value={employee.pfNumber} />
-          </div>
-
-          <GoldRule />
-
-          {/* ============ COMPENSATION ============ */}
-          <div className="flex flex-col items-center justify-between gap-6 px-8 py-10 sm:flex-row sm:px-14">
-            <div className="text-center sm:text-left">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.32em]" style={{ color: GOLD }}>
-                Annual Compensation
-              </p>
-              <h2 className="mt-2 text-3xl leading-none tracking-tight" style={{ ...displayFont, fontWeight: 700 }}>
-                ₹{Number(employee.salary || 0).toLocaleString('en-IN')}
-              </h2>
-            </div>
-            <div
-              className="flex items-center gap-2.5 rounded-full px-6 py-3 text-[9px] font-semibold uppercase tracking-[0.24em]"
-              style={{ backgroundColor: CREAM, color: "#8A8378", border: `1px solid ${HAIRLINE}` }}
-            >
-              <CreditCard size={14} strokeWidth={1.5} style={{ color: GOLD }} />
-              Paid Annually
-            </div>
-          </div>
-        </div>
-
-        <p className="mt-6 text-center text-[9px] font-semibold uppercase tracking-[0.28em]" style={{ color: "#8A8378" }}>
-          Verified &nbsp;·&nbsp; Active &nbsp;·&nbsp; On-Site
-        </p>
+        </motion.section>
       </div>
 
-      {/* ============ IMAGE LIGHTBOX ============ */}
-      {isImageOpen && hasProfileImage && (
-        <div
-          onClick={() => setIsImageOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-sm"
-          style={{ backgroundColor: "rgba(28,26,23,0.82)" }}
-        >
-          <button
+      {/* ================= IMAGE LIGHTBOX ================= */}
+      <AnimatePresence>
+        {isImageOpen && hasPhoto && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={() => setIsImageOpen(false)}
-            className="absolute right-5 top-5 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/20 text-white transition-colors hover:bg-white/10"
-            aria-label="Close"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/85 p-6 backdrop-blur-md"
           >
-            <X size={18} strokeWidth={1.75} />
-          </button>
-          <img
-            src={getImageUrl(employee.userId.profileImage)}
-            alt="Profile enlarged"
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl"
-          />
-        </div>
-      )}
+            <button
+              onClick={() => setIsImageOpen(false)}
+              className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white ring-1 ring-white/20 transition hover:rotate-90 hover:bg-red-600"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+            <motion.figure
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-center"
+            >
+              <img src={photo} alt={name} className="max-h-[80vh] max-w-full rounded-3xl object-contain shadow-2xl" />
+              <figcaption className="mt-4 text-sm font-semibold text-white/80">{name}</figcaption>
+            </motion.figure>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
-// --- SUPPORTING COMPONENTS ---
-
-const GoldRule = () => (
-  <div className="px-8 sm:px-14">
-    <div className="h-px" style={{ backgroundColor: `${GOLD}45` }} />
-  </div>
-);
-
-const Field = ({ icon, label, value }) => (
-  <div>
-    <div className="flex items-center gap-2" style={{ color: GOLD }}>
-      {icon}
-      <span className="text-[9px] font-semibold uppercase tracking-[0.2em]" style={{ color: "#8A8378" }}>{label}</span>
+/* ================= LOADING / ERROR ================= */
+const LoadingView = () => (
+  <div className={`min-h-screen px-4 pt-6 sm:px-8 ${PAGE_BG}`}>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <Skeleton className="h-11 w-28" />
+      <div className="overflow-hidden rounded-[2rem] bg-white/60">
+        <div className="h-32 animate-pulse bg-red-200/50 sm:h-40" />
+        <div className="space-y-4 p-6 sm:p-8">
+          <div className="flex items-end gap-4">
+            <div className="-mt-20 h-32 w-32 animate-pulse rounded-[2rem] bg-white" />
+            <div className="flex-1 space-y-2"><Skeleton className="h-7 w-1/3" /><Skeleton className="h-4 w-1/4" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16" />)}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-72" />)}</div>
     </div>
-    <p className="mt-1.5 truncate text-base tracking-tight" style={{ ...displayFont, fontWeight: 700 }}>
-      {value || "—"}
-    </p>
   </div>
 );
 
-const LoadingPulse = () => (
-  <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gradient-to-br from-[#FBF8F3] via-white to-[#F3EDE0]">
-    <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#E7DFD2] border-t-[#7A2233]"></div>
-    <p className="text-[9px] font-semibold uppercase tracking-[0.32em]" style={{ color: "#8A8378", ...bodyFont }}>Preparing Dossier</p>
-  </div>
-);
-
-const ErrorView = () => (
-  <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#FBF8F3] via-white to-[#F3EDE0] p-6 text-center">
-    <div className="rounded-[1.75rem] border bg-white/80 px-12 py-14 shadow-[0_40px_90px_-32px_rgba(28,26,23,0.24)] backdrop-blur-md" style={{ borderColor: HAIRLINE }}>
-      <h2 className="text-3xl leading-none tracking-tight" style={{ ...displayFont, fontWeight: 700 }}>
-        Not Found
-      </h2>
-      <button
-        onClick={() => window.history.back()}
-        className="mt-6 cursor-pointer rounded-full px-8 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition-colors"
-        style={{ backgroundColor: INK, ...bodyFont }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = GARNET)}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = INK)}
-      >
-        Go Back
-      </button>
-    </div>
+const ErrorView = ({ message, onRetry, onBack }) => (
+  <div className={`flex min-h-screen items-center justify-center p-6 font-sans ${PAGE_BG}`}>
+    <motion.div
+      initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-sm overflow-hidden rounded-[2rem] bg-white text-center shadow-[0_40px_90px_-20px_rgba(127,29,29,0.35)] ring-1 ring-red-100"
+    >
+      <div className="h-1.5 bg-gradient-to-r from-red-600 via-rose-500 to-orange-400" />
+      <div className="p-8">
+        <span className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl ${message ? "bg-amber-50 text-amber-500" : "bg-red-50 text-red-400"}`}>
+          {message ? <AlertTriangle size={28} /> : <User size={28} />}
+        </span>
+        <h2 className="text-xl font-extrabold tracking-tight text-gray-900">{message ? "Couldn't load profile" : "Employee not found"}</h2>
+        <p className="mt-2 text-sm text-gray-500">{message || "This person may have been removed, or the link is wrong."}</p>
+        <div className="mt-6 flex gap-2">
+          <button onClick={onBack} className="flex-1 rounded-2xl bg-gray-50 py-3 text-sm font-bold text-gray-600 ring-1 ring-gray-200 transition hover:bg-white hover:text-gray-900">
+            Go back
+          </button>
+          {onRetry && (
+            <button onClick={onRetry} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30">
+              <RefreshCw size={15} /> Try again
+            </button>
+          )}
+        </div>
+      </div>
+    </motion.div>
   </div>
 );
 
