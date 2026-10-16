@@ -6,16 +6,19 @@ import {
   ensureDomainIndexes, setClock, setJoiningDates, ist, installFakeImageKit, pdfBytes, PNG_BYTES, streamedResponse,
 } from "./helpers/domain.js";
 
-let app, fx, ikLog, fetchLog, Payslip, setPayslipFetch, payslipFiles;
+let app, fx, ikLog, fetchLog, Payslip, Attendance, Leave, setPayslipFetch, payslipFiles;
 // Default upstream: a valid PDF, streamed. Tests may replace `upstream` with a function(url, init) -> Response.
 let upstream = null;
 const defaultUpstream = () => streamedResponse([pdfBytes(2048)]);
+const { formatPayPeriod } = await import("../services/pdfPayslipGenerator.js");
 
 before(async () => {
   await startTestDb();
   app = await getApp();
   await ensureDomainIndexes();
   Payslip = (await import("../models/Payslip.js")).default;
+  Attendance = (await import("../models/Attendance.js")).default;
+  Leave = (await import("../models/Leave.js")).default;
   ikLog = await installFakeImageKit();
   payslipFiles = await import("../services/payslipFiles.js");
   ({ setPayslipFetch } = payslipFiles);
@@ -136,6 +139,68 @@ test("server computes totals from validated numbers; month/employee/duplicate ch
   assert.equal(unknownEmp.status, 404);
   const badId = await addPayslip(fx.admin, { employeeId: "abc", fields: { ...FIELDS, month: "2026-08" } });
   assert.equal(badId.status, 400);
+});
+
+test("auto-generated payslip applies LOP only for absent days, not approved leave", async () => {
+  const employee = fx.itDev1.employee;
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const date = `2026-09-${String(index + 1).padStart(2, "0")}`;
+    return {
+      employeeId: employee._id,
+      date,
+      status: date === "2026-09-14" ? "Absent" : "Present",
+    };
+  });
+  await Attendance.insertMany(days);
+  await Leave.create({
+    employeeId: employee._id,
+    leaveType: "Casual Leave",
+    startDate: new Date("2026-09-15T00:00:00Z"),
+    endDate: new Date("2026-09-15T00:00:00Z"),
+    status: "Approved",
+    days: 1,
+  });
+
+  const response = await request(app)
+    .post("/api/payslip/auto-generate")
+    .set(auth(fx.admin))
+    .send({ employeeId: String(employee._id), month: "2026-09" });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.payslip.lossOfPay, Math.round(employee.salary / days.length));
+});
+
+test("payslip PDF pay period uses the full month and year", () => {
+  assert.equal(formatPayPeriod("2026-09"), "September 2026");
+});
+
+test("admin can delete a payslip and its private PDF", async () => {
+  const payslip = (await addPayslip(fx.admin, { employeeId: fx.itDev1.employee._id })).body.payslip;
+  const stored = await Payslip.findById(payslip._id).lean();
+
+  const denied = await request(app)
+    .delete(`/api/payslip/${payslip._id}`)
+    .set(auth(fx.itDev1.user));
+  assert.equal(denied.status, 403);
+  assert.equal(await Payslip.countDocuments({ _id: payslip._id }), 1);
+  assert.equal(ikLog.deletes.length, 0);
+
+  const deleted = await request(app)
+    .delete(`/api/payslip/${payslip._id}`)
+    .set(auth(fx.admin));
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.success, true);
+  assert.equal(await Payslip.countDocuments({ _id: payslip._id }), 0);
+  assert.deepEqual(ikLog.deletes, [stored.fileId]);
+
+  const missing = await request(app)
+    .delete(`/api/payslip/${payslip._id}`)
+    .set(auth(fx.admin));
+  assert.equal(missing.status, 404);
+  const invalidId = await request(app)
+    .delete("/api/payslip/not-an-id")
+    .set(auth(fx.admin));
+  assert.equal(invalidId.status, 400);
 });
 
 test("lists: employee sees own only, with hasFile and no file URL", async () => {
