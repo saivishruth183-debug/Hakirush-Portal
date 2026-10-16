@@ -1,5 +1,14 @@
 import PDFDocument from "pdfkit";
 
+export const formatPayPeriod = (month) => {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1, 1)).toLocaleDateString("en-IN", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
 /**
  * Generates a branded, professional company payslip as a PDF Buffer using pdfkit.
  * @param {Object} employee - Employee document (populated with userId and department)
@@ -53,7 +62,7 @@ export const generatePayslipPdfBuffer = async ({
         .font("Helvetica-Bold")
         .fontSize(12)
         .fillColor("#FFFFFF")
-        .text(`PAY PERIOD: ${month}`, 400, 65, { align: "right", width: 140 });
+        .text(`PAY PERIOD: ${formatPayPeriod(month)}`, 400, 65, { align: "right", width: 140 });
 
       // 2. EMPLOYEE DETAILS BOX
       const empY = 120;
