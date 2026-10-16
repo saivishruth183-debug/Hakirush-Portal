@@ -1,298 +1,177 @@
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Eye, Edit2, UserX, UserCheck, Plane, Receipt, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Eye, Pencil, UserX, UserCheck, Plane, Receipt, AlertTriangle, CheckCircle2, Loader2, Crown,
+  ShieldOff, History, LogIn, X,
+} from "lucide-react";
 import { apiErrorCode, apiErrorMessage } from "./apiError";
 
-/* ================= CONFIGURATION =================
-   Same editorial system as the rest of the admin area —
-   deep garnet + antique gold on warm paper.
-*/
-const INK = "#1C1A17";
-const GARNET = "#7A2233";
-const GOLD = "#C6A15B";
-const HAIRLINE = "#E7DFD2";
+const AUTO_CLOSE_MS = 1800;
 
-const displayFont = { fontFamily: "'Playfair Display', 'Georgia', serif" };
-const bodyFont = { fontFamily: "'Inter', 'Helvetica Neue', sans-serif" };
+/* ================= MODAL SHELL ================= */
+const Modal = ({ open, onClose, dismissable = true, children }) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === "Escape" && dismissable && onClose?.();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, dismissable, onClose]);
 
-/* ================= CONFIRM DEACTIVATE =================
-   DELETE /api/employee/:id is retention-safe: it deactivates the account
-   (sign-in blocked, sessions revoked) and keeps payroll/attendance/leave history. */
-const ConfirmDeleteAlert = ({ onConfirm, onCancel, busy }) => {
   return createPortal(
-    <>
-      <div className="fixed inset-0 z-[100] animate-in fade-in bg-[#1C1A17]/40 backdrop-blur-md duration-300" />
-      <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm animate-in zoom-in-95 overflow-hidden rounded-[2.25rem] border border-[#E7DFD2] bg-white shadow-[0_35px_70px_-15px_rgba(28,26,23,0.35)] duration-200"
-          style={bodyFont}
-        >
-          <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${GARNET}, ${GOLD} 45%, ${GARNET})` }} />
-
-          <div className="p-8 text-center">
-            <span
-              className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-              style={{ borderColor: `${GARNET}40`, color: GARNET, backgroundColor: `${GARNET}0A` }}
-            >
-              <span
-                className="absolute inset-0 animate-ping-slow rounded-full"
-                style={{ backgroundColor: `${GARNET}14` }}
-              />
-              <AlertTriangle size={30} strokeWidth={1.5} className="relative" />
-            </span>
-
-            <h3
-              className="text-2xl leading-none tracking-tight text-[#1C1A17]"
-              style={{ ...displayFont, fontWeight: 700 }}
-            >
-              Deactivate employee<span className="italic text-[#7A2233]">?</span>
-            </h3>
-            <p className="mt-3 text-[12px] font-medium leading-relaxed text-[#8A8378]">
-              They will no longer be able to sign in and all of their sessions end.
-              Payroll, attendance and leave history are retained.
-            </p>
-          </div>
-
-          <div className="flex gap-3 px-8 pb-8">
-            <button
-              onClick={onCancel}
-              className="w-1/2 cursor-pointer rounded-2xl border py-3.5 text-[10px] font-semibold uppercase tracking-widest text-[#8A8378] transition-all duration-300 hover:border-[#D9C79A] hover:text-[#1C1A17] active:scale-95"
-              style={{ borderColor: HAIRLINE, backgroundColor: "#FBF8F3" }}
-            >
-              Abort
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={busy}
-              className="w-1/2 cursor-pointer rounded-2xl py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_16px_32px_-12px_rgba(122,34,51,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_38px_-12px_rgba(122,34,51,0.55)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: `linear-gradient(155deg, ${INK} 0%, ${GARNET} 100%)` }}
-            >
-              {busy ? "Working…" : "Deactivate"}
-            </button>
-          </div>
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center font-sans sm:items-center sm:p-4">
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => dismissable && onClose?.()}
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0, y: 40, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 40, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            className="relative w-full max-w-sm overflow-hidden rounded-t-[2rem] bg-white text-left shadow-[0_40px_90px_-20px_rgba(127,29,29,0.45)] ring-1 ring-red-100 sm:rounded-[2rem]"
+          >
+            {children}
+          </motion.div>
         </div>
-      </div>
-    </>,
+      )}
+    </AnimatePresence>,
     document.body
   );
 };
 
-/* ================= PREMIUM SUCCESS ALERT ================= */
-const DeleteSuccessAlert = ({ onClose }) => {
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[100] animate-in fade-in bg-[#1C1A17]/20 backdrop-blur-sm" />
-      <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm animate-in zoom-in-95 overflow-hidden rounded-[2.25rem] border border-[#E7DFD2] bg-white p-8 text-center shadow-[0_35px_70px_-15px_rgba(28,26,23,0.35)]"
-          style={bodyFont}
-        >
-          <span
-            className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-            style={{ borderColor: "#3F5B5440", color: "#3F5B54", backgroundColor: "#3F5B540A" }}
-          >
-            <span
-              className="absolute inset-0 animate-ping-slow rounded-full"
-              style={{ backgroundColor: "#3F5B5414" }}
-            />
-            <CheckCircle2 size={30} strokeWidth={1.5} className="relative" />
-          </span>
-
-          <h3
-            className="text-2xl leading-none tracking-tight text-[#1C1A17]"
-            style={{ ...displayFont, fontWeight: 700 }}
-          >
-            <span className="italic text-[#7A2233]">Deactivated</span>
-          </h3>
-          <p className="mt-2 mb-6 text-[10.5px] font-semibold uppercase tracking-widest text-[#B4ADA0]">
-            Account disabled. History retained.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full cursor-pointer rounded-2xl py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_16px_32px_-12px_rgba(28,26,23,0.35)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
-            style={{ background: `linear-gradient(155deg, ${INK} 0%, ${GARNET} 100%)` }}
-          >
-            Acknowledged
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
+const TONES = {
+  danger: { bar: "from-red-600 via-rose-500 to-orange-400", icon: "from-red-600 to-rose-500 shadow-red-600/35" },
+  success: { bar: "from-emerald-500 via-teal-400 to-emerald-500", icon: "from-emerald-500 to-teal-500 shadow-emerald-500/35" },
+  warning: { bar: "from-amber-500 via-orange-400 to-amber-500", icon: "from-amber-500 to-orange-500 shadow-amber-500/35" },
 };
 
-/* ================= CONFIRM REACTIVATE ================= */
-const ConfirmReactivateAlert = ({ onConfirm, onCancel, busy }) => {
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[100] animate-in fade-in bg-[#1C1A17]/40 backdrop-blur-md duration-300" />
-      <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm animate-in zoom-in-95 overflow-hidden rounded-[2.25rem] border border-[#E7DFD2] bg-white shadow-[0_35px_70px_-15px_rgba(28,26,23,0.35)] duration-200"
-          style={bodyFont}
-        >
-          <div className="h-[3px]" style={{ background: `linear-gradient(90deg, #3F5B54, ${GOLD} 45%, #3F5B54)` }} />
+const ModalHead = ({ icon: Icon, tone, title, children }) => (
+  <>
+    <div className={`h-1.5 bg-gradient-to-r ${TONES[tone].bar}`} />
+    <div className="px-7 pb-2 pt-7 text-center">
+      <motion.span
+        initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 16, delay: 0.05 }}
+        className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center"
+      >
+        <span className={`absolute inset-0 animate-ping rounded-3xl bg-gradient-to-br opacity-20 [animation-duration:2s] ${TONES[tone].icon}`} />
+        <span className={`relative flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br text-white shadow-lg ${TONES[tone].icon}`}>
+          <Icon size={28} strokeWidth={2} />
+        </span>
+      </motion.span>
+      <h3 className="text-xl font-extrabold tracking-tight text-gray-900">{title}</h3>
+      {children}
+    </div>
+  </>
+);
 
-          <div className="p-8 text-center">
-            <span
-              className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-              style={{ borderColor: "#3F5B5440", color: "#3F5B54", backgroundColor: "#3F5B540A" }}
-            >
-              <span
-                className="absolute inset-0 animate-ping-slow rounded-full"
-                style={{ backgroundColor: "#3F5B5414" }}
-              />
-              <UserCheck size={30} strokeWidth={1.5} className="relative" />
-            </span>
+const Fact = ({ icon: Icon, tone, children }) => (
+  <li className="flex items-start gap-2.5">
+    <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${tone}`}>
+      <Icon size={13} />
+    </span>
+    <span className="text-xs leading-relaxed text-gray-600">{children}</span>
+  </li>
+);
 
-            <h3
-              className="text-2xl leading-none tracking-tight text-[#1C1A17]"
-              style={{ ...displayFont, fontWeight: 700 }}
-            >
-              Reactivate employee<span className="italic text-[#3F5B54]">?</span>
-            </h3>
-            <p className="mt-3 text-[12px] font-medium leading-relaxed text-[#8A8378]">
-              They will be able to sign in again and access the portal.
-              All existing history remains intact.
-            </p>
-          </div>
+const BtnSecondary = ({ children, ...p }) => (
+  <button
+    {...p}
+    className="flex-1 rounded-2xl bg-gray-50 py-3.5 text-sm font-bold text-gray-600 ring-1 ring-gray-200 transition hover:bg-white hover:text-gray-900 active:scale-[0.98] disabled:opacity-50"
+  >
+    {children}
+  </button>
+);
 
-          <div className="flex gap-3 px-8 pb-8">
-            <button
-              onClick={onCancel}
-              className="w-1/2 cursor-pointer rounded-2xl border py-3.5 text-[10px] font-semibold uppercase tracking-widest text-[#8A8378] transition-all duration-300 hover:border-[#D9C79A] hover:text-[#1C1A17] active:scale-95"
-              style={{ borderColor: HAIRLINE, backgroundColor: "#FBF8F3" }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={busy}
-              className="w-1/2 cursor-pointer rounded-2xl py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_16px_32px_-12px_rgba(63,91,84,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_38px_-12px_rgba(63,91,84,0.55)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: "linear-gradient(155deg, #1C1A17 0%, #3F5B54 100%)" }}
-            >
-              {busy ? "Working…" : "Reactivate"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-};
+const BtnPrimary = ({ tone = "danger", busy, busyText, children, ...p }) => (
+  <button
+    {...p}
+    disabled={busy || p.disabled}
+    className={`flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r py-3.5 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] disabled:translate-y-0 disabled:opacity-80 ${
+      tone === "success" ? "from-emerald-600 to-teal-500 shadow-emerald-600/30" : "from-red-600 to-rose-500 shadow-red-600/30"
+    }`}
+  >
+    {busy ? <><Loader2 size={16} className="animate-spin" /> {busyText}</> : children}
+  </button>
+);
 
-/* ================= REACTIVATE SUCCESS ALERT ================= */
-const ReactivateSuccessAlert = ({ onClose }) => {
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[100] animate-in fade-in bg-[#1C1A17]/20 backdrop-blur-sm" />
-      <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm animate-in zoom-in-95 overflow-hidden rounded-[2.25rem] border border-[#E7DFD2] bg-white p-8 text-center shadow-[0_35px_70px_-15px_rgba(28,26,23,0.35)]"
-          style={bodyFont}
-        >
-          <span
-            className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-            style={{ borderColor: "#3F5B5440", color: "#3F5B54", backgroundColor: "#3F5B540A" }}
-          >
-            <span
-              className="absolute inset-0 animate-ping-slow rounded-full"
-              style={{ backgroundColor: "#3F5B5414" }}
-            />
-            <CheckCircle2 size={30} strokeWidth={1.5} className="relative" />
-          </span>
-
-          <h3
-            className="text-2xl leading-none tracking-tight text-[#1C1A17]"
-            style={{ ...displayFont, fontWeight: 700 }}
-          >
-            <span className="italic text-[#3F5B54]">Reactivated</span>
-          </h3>
-          <p className="mt-2 mb-6 text-[10.5px] font-semibold uppercase tracking-widest text-[#B4ADA0]">
-            Account restored. Employee can sign in.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full cursor-pointer rounded-2xl py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white shadow-[0_16px_32px_-12px_rgba(28,26,23,0.35)] transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
-            style={{ background: "linear-gradient(155deg, #1C1A17 0%, #3F5B54 100%)" }}
-          >
-            Acknowledged
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-};
+const CountdownBar = ({ tone = "success" }) => (
+  <motion.div
+    initial={{ scaleX: 1 }}
+    animate={{ scaleX: 0 }}
+    transition={{ duration: AUTO_CLOSE_MS / 1000, ease: "linear" }}
+    className={`h-1 origin-left bg-gradient-to-r ${tone === "success" ? "from-emerald-500 to-teal-400" : "from-gray-400 to-gray-300"}`}
+  />
+);
 
 /* ================= ICON BUTTON WITH TOOLTIP ================= */
-const IconButton = ({ icon, label, onClick, variant = "default" }) => {
-  const [hovered, setHovered] = useState(false);
-
-  const base =
-    "group relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all duration-300 active:scale-90";
-
-  const variants = {
-    default: {
-      className: `${base} text-[#B4ADA0] hover:text-[#7A2233] hover:shadow-[0_10px_20px_-8px_rgba(198,161,91,0.35)]`,
-      style: { borderColor: HAIRLINE, backgroundColor: "white" },
-      hoverStyle: { borderColor: "#D9C79A" },
-    },
-    danger: {
-      className: `${base} border-transparent text-[#C9C2B4] hover:text-white hover:shadow-[0_10px_22px_-8px_rgba(122,34,51,0.45)]`,
-      style: { backgroundColor: "#FBF8F3" },
-      hoverStyle: { backgroundColor: GARNET },
-    },
-  };
-
-  const v = variants[variant];
-
-  return (
-    <div className="relative">
-      <button
-        onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        className={v.className}
-        style={hovered ? { ...v.style, ...v.hoverStyle } : v.style}
-        aria-label={label}
-      >
-        {icon}
-      </button>
-
-      {/* CUSTOM TOOLTIP */}
-      <span
-        className={`pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-widest text-white transition-all duration-200 ${
-          hovered ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-        }`}
-        style={{ backgroundColor: INK, ...bodyFont }}
-      >
-        {label}
-        <span
-          className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent"
-          style={{ borderTopColor: INK }}
-        />
-      </span>
-    </div>
-  );
+const VARIANTS = {
+  view: "text-sky-600 bg-sky-50 ring-sky-100 hover:bg-sky-500 hover:text-white hover:ring-sky-500 hover:shadow-sky-500/30",
+  edit: "text-amber-600 bg-amber-50 ring-amber-100 hover:bg-amber-500 hover:text-white hover:ring-amber-500 hover:shadow-amber-500/30",
+  leave: "text-violet-600 bg-violet-50 ring-violet-100 hover:bg-violet-500 hover:text-white hover:ring-violet-500 hover:shadow-violet-500/30",
+  pay: "text-teal-600 bg-teal-50 ring-teal-100 hover:bg-teal-500 hover:text-white hover:ring-teal-500 hover:shadow-teal-500/30",
+  danger: "text-red-600 bg-red-50 ring-red-100 hover:bg-gradient-to-br hover:from-red-600 hover:to-rose-500 hover:text-white hover:ring-red-500 hover:shadow-red-600/30",
+  success: "text-emerald-600 bg-emerald-50 ring-emerald-100 hover:bg-emerald-500 hover:text-white hover:ring-emerald-500 hover:shadow-emerald-500/30",
 };
+
+const IconButton = ({ icon: Icon, label, onClick, variant = "view", disabled }) => (
+  <div className="group/btn relative">
+    <motion.button
+      type="button"
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.9 }}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-colors duration-200 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]}`}
+    >
+      <Icon size={16} strokeWidth={2} />
+    </motion.button>
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-lg transition-all duration-150 group-hover/btn:translate-y-0 group-hover/btn:opacity-100 group-focus-within/btn:translate-y-0 group-focus-within/btn:opacity-100"
+    >
+      {label}
+      <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+    </span>
+  </div>
+);
 
 /* ================= MAIN ACTION COMPONENT ================= */
 export const EmployeeButtons = ({ id, refresh, isActive }) => {
   const navigate = useNavigate();
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showReactivateConfirm, setShowReactivateConfirm] = useState(false);
-  const [showReactivateSuccess, setShowReactivateSuccess] = useState(false);
+  // null | "deactivate" | "manager" | "deactivated" | "reactivate" | "reactivated" | "error"
+  const [modal, setModal] = useState(null);
+  const [managerMsg, setManagerMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const close = () => !busy && setModal(null);
+
+  // auto-close the success popups
+  useEffect(() => {
+    if (modal !== "deactivated" && modal !== "reactivated") return;
+    const t = setTimeout(() => setModal(null), AUTO_CLOSE_MS);
+    return () => clearTimeout(t);
+  }, [modal]);
 
   const sendDeactivate = (clearManager = false) =>
     axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/employee/${id}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       ...(clearManager ? { data: { clearManager: true } } : {}),
     });
 
@@ -300,50 +179,33 @@ export const EmployeeButtons = ({ id, refresh, isActive }) => {
     axios.patch(
       `${import.meta.env.VITE_BACKEND_URL}/api/employee/${id}/status`,
       { isActive: true },
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
+      { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
     );
 
-  const deactivateEmployee = async () => {
+  const fail = (err, fallback) => {
+    setErrorMsg(apiErrorMessage(err, fallback));
+    setModal("error");
+  };
+
+  const deactivateEmployee = async (clearManager = false) => {
     if (busy) return;
     setBusy(true);
     try {
-      let res;
-      try {
-        res = await sendDeactivate(false);
-      } catch (err) {
-        // The employee currently manages a department: offer to clear it.
-        if (apiErrorCode(err) !== "MANAGER_REASSIGNMENT_REQUIRED") throw err;
-        const ok = window.confirm(
-          `${apiErrorMessage(err, "This employee is the manager of their department.")}\n\n` +
-            "Clear the department's manager assignment and deactivate this employee?"
-        );
-        if (!ok) {
-          setShowConfirm(false);
-          return;
-        }
-        res = await sendDeactivate(true);
-      }
-
+      const res = await sendDeactivate(clearManager);
       if (res.data.success) {
-        setShowConfirm(false);
-        setShowSuccess(true);
-
+        setModal("deactivated");
         // Immediate background refresh for smooth data transition
-        if (refresh) refresh();
-
-        // Auto-clear success modal
-        setTimeout(() => {
-          setShowSuccess(false);
-        }, 1500);
+        refresh?.();
       }
     } catch (err) {
-      console.error("Employee deactivation failed.", err);
-      setShowConfirm(false);
-      alert(apiErrorMessage(err, "Unable to deactivate this employee."));
+      // The employee currently manages a department: offer to clear it.
+      if (!clearManager && apiErrorCode(err) === "MANAGER_REASSIGNMENT_REQUIRED") {
+        setManagerMsg(apiErrorMessage(err, "This employee is the manager of their department."));
+        setModal("manager");
+      } else {
+        console.error("Employee deactivation failed.", err);
+        fail(err, "Unable to deactivate this employee.");
+      }
     } finally {
       setBusy(false);
     }
@@ -355,19 +217,12 @@ export const EmployeeButtons = ({ id, refresh, isActive }) => {
     try {
       const res = await sendReactivate();
       if (res.data.success) {
-        setShowReactivateConfirm(false);
-        setShowReactivateSuccess(true);
-
-        if (refresh) refresh();
-
-        setTimeout(() => {
-          setShowReactivateSuccess(false);
-        }, 1500);
+        setModal("reactivated");
+        refresh?.();
       }
     } catch (err) {
       console.error("Employee reactivation failed.", err);
-      setShowReactivateConfirm(false);
-      alert(apiErrorMessage(err, "Unable to reactivate this employee."));
+      fail(err, "Unable to reactivate this employee.");
     } finally {
       setBusy(false);
     }
@@ -375,73 +230,109 @@ export const EmployeeButtons = ({ id, refresh, isActive }) => {
 
   return (
     <>
-      {showConfirm && (
-        <ConfirmDeleteAlert
-          onConfirm={deactivateEmployee}
-          onCancel={() => setShowConfirm(false)}
-          busy={busy}
-        />
-      )}
+      {/* ---------- confirm deactivate ---------- */}
+      <Modal open={modal === "deactivate"} onClose={close} dismissable={!busy}>
+        <ModalHead icon={UserX} tone="danger" title={<>Deactivate this <span className="text-red-600">employee?</span></>} />
+        <ul className="mx-7 mt-3 space-y-2.5 rounded-2xl bg-gray-50/80 p-4 ring-1 ring-gray-100">
+          <Fact icon={ShieldOff} tone="bg-red-50 text-red-600">They <b>won't be able to sign in</b>, and any open sessions end right away.</Fact>
+          <Fact icon={History} tone="bg-emerald-50 text-emerald-600">Payroll, attendance and leave history are <b>kept</b>.</Fact>
+          <Fact icon={UserCheck} tone="bg-sky-50 text-sky-600">You can reactivate them at any time.</Fact>
+        </ul>
+        <div className="flex gap-3 p-7 pt-5">
+          <BtnSecondary onClick={close} disabled={busy}>Cancel</BtnSecondary>
+          <BtnPrimary busy={busy} busyText="Deactivating…" onClick={() => deactivateEmployee(false)}>
+            <UserX size={16} /> Deactivate
+          </BtnPrimary>
+        </div>
+      </Modal>
 
-      {showSuccess && (
-        <DeleteSuccessAlert onClose={() => setShowSuccess(false)} />
-      )}
+      {/* ---------- manager reassignment (replaces window.confirm) ---------- */}
+      <Modal open={modal === "manager"} onClose={close} dismissable={!busy}>
+        <ModalHead icon={Crown} tone="warning" title="They manage a department">
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">{managerMsg}</p>
+        </ModalHead>
+        <div className="mx-7 mt-3 rounded-2xl bg-amber-50 p-3.5 text-xs leading-relaxed text-amber-900 ring-1 ring-amber-100">
+          Continuing will <b>clear the department's manager</b> and deactivate this employee. You can choose a new manager later from <b>Departments → Edit</b>.
+        </div>
+        <div className="flex gap-3 p-7 pt-5">
+          <BtnSecondary onClick={close} disabled={busy}>Cancel</BtnSecondary>
+          <BtnPrimary busy={busy} busyText="Working…" onClick={() => deactivateEmployee(true)}>
+            Clear & deactivate
+          </BtnPrimary>
+        </div>
+      </Modal>
 
-      {showReactivateConfirm && (
-        <ConfirmReactivateAlert
-          onConfirm={reactivateEmployee}
-          onCancel={() => setShowReactivateConfirm(false)}
-          busy={busy}
-        />
-      )}
+      {/* ---------- deactivated ---------- */}
+      <Modal open={modal === "deactivated"} onClose={() => setModal(null)}>
+        <ModalHead icon={CheckCircle2} tone="success" title="Employee deactivated">
+          <p className="mt-2 text-sm text-gray-500">Their account is disabled. All history is kept.</p>
+        </ModalHead>
+        <div className="p-7 pt-5">
+          <button onClick={() => setModal(null)} className="w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]">
+            Okay, got it
+          </button>
+        </div>
+        <CountdownBar />
+      </Modal>
 
-      {showReactivateSuccess && (
-        <ReactivateSuccessAlert onClose={() => setShowReactivateSuccess(false)} />
-      )}
+      {/* ---------- confirm reactivate ---------- */}
+      <Modal open={modal === "reactivate"} onClose={close} dismissable={!busy}>
+        <ModalHead icon={UserCheck} tone="success" title={<>Reactivate this <span className="text-emerald-600">employee?</span></>} />
+        <ul className="mx-7 mt-3 space-y-2.5 rounded-2xl bg-gray-50/80 p-4 ring-1 ring-gray-100">
+          <Fact icon={LogIn} tone="bg-emerald-50 text-emerald-600">They'll be able to <b>sign in</b> and use the portal again.</Fact>
+          <Fact icon={History} tone="bg-sky-50 text-sky-600">All their existing history stays exactly as it was.</Fact>
+        </ul>
+        <div className="flex gap-3 p-7 pt-5">
+          <BtnSecondary onClick={close} disabled={busy}>Cancel</BtnSecondary>
+          <BtnPrimary tone="success" busy={busy} busyText="Reactivating…" onClick={reactivateEmployee}>
+            <UserCheck size={16} /> Reactivate
+          </BtnPrimary>
+        </div>
+      </Modal>
 
-      <div className="flex items-center justify-end gap-2">
-        <IconButton
-          variant="default"
-          label="View profile"
-          icon={<Eye size={16} strokeWidth={1.75} />}
-          onClick={() => navigate(`/admin-dashboard/employees/${id}`)}
-        />
+      {/* ---------- reactivated ---------- */}
+      <Modal open={modal === "reactivated"} onClose={() => setModal(null)}>
+        <ModalHead icon={CheckCircle2} tone="success" title="Employee reactivated">
+          <p className="mt-2 text-sm text-gray-500">Their account is restored and they can sign in again.</p>
+        </ModalHead>
+        <div className="p-7 pt-5">
+          <button onClick={() => setModal(null)} className="w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]">
+            Okay, got it
+          </button>
+        </div>
+        <CountdownBar />
+      </Modal>
 
-        <IconButton
-          variant="default"
-          label="Edit details"
-          icon={<Edit2 size={15} strokeWidth={1.75} />}
-          onClick={() => navigate(`/admin-dashboard/employees/edit/${id}`)}
-        />
+      {/* ---------- error (replaces alert) ---------- */}
+      <Modal open={modal === "error"} onClose={() => setModal(null)}>
+        <button
+          onClick={() => setModal(null)}
+          aria-label="Close"
+          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-gray-50 text-gray-400 transition hover:rotate-90 hover:text-gray-700"
+        >
+          <X size={15} />
+        </button>
+        <ModalHead icon={AlertTriangle} tone="warning" title="Something went wrong">
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">{errorMsg}</p>
+        </ModalHead>
+        <div className="p-7 pt-5">
+          <button onClick={() => setModal(null)} className="w-full rounded-2xl bg-gray-900 py-3.5 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]">
+            Okay
+          </button>
+        </div>
+      </Modal>
 
-        <IconButton
-          variant="default"
-          label="Leaves"
-          icon={<Plane size={15} strokeWidth={1.75} />}
-          onClick={() => navigate(`/admin-dashboard/employees/leaves/${id}`)}
-        />
-
-        <IconButton
-          variant="default"
-          label="Payslip"
-          icon={<Receipt size={15} strokeWidth={1.75} />}
-          onClick={() => navigate(`/admin-dashboard/employees/payslip/${id}`)}
-        />
-
+      {/* ---------- the buttons ---------- */}
+      <div className="flex items-center justify-end gap-1.5">
+        <IconButton variant="view" label="View profile" icon={Eye} onClick={() => navigate(`/admin-dashboard/employees/${id}`)} />
+        <IconButton variant="edit" label="Edit details" icon={Pencil} onClick={() => navigate(`/admin-dashboard/employees/edit/${id}`)} />
+        <IconButton variant="leave" label="Leaves" icon={Plane} onClick={() => navigate(`/admin-dashboard/employees/leaves/${id}`)} />
+        <IconButton variant="pay" label="Payslip" icon={Receipt} onClick={() => navigate(`/admin-dashboard/employees/payslip/${id}`)} />
+        <span className="mx-0.5 h-6 w-px bg-gray-200" aria-hidden />
         {isActive === false ? (
-          <IconButton
-            variant="default"
-            label="Reactivate"
-            icon={<UserCheck size={15} strokeWidth={1.75} />}
-            onClick={() => setShowReactivateConfirm(true)}
-          />
+          <IconButton variant="success" label="Reactivate" icon={UserCheck} disabled={busy} onClick={() => setModal("reactivate")} />
         ) : (
-          <IconButton
-            variant="danger"
-            label="Deactivate"
-            icon={<UserX size={15} strokeWidth={1.75} />}
-            onClick={() => setShowConfirm(true)}
-          />
+          <IconButton variant="danger" label="Deactivate" icon={UserX} disabled={busy} onClick={() => setModal("deactivate")} />
         )}
       </div>
     </>
@@ -455,14 +346,9 @@ export const EmployeeButtons = ({ id, refresh, isActive }) => {
  */
 export const fetchEmployees = async () => {
   try {
-    const res = await axios.get(
-      `${import.meta.env.VITE_BACKEND_URL}/api/employee`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
+    const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/employee`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     return res.data.success ? res.data.employees : [];
   } catch (error) {
     console.error("Sync Error: Failed to fetch employees.", error.response?.data || error);
@@ -475,15 +361,9 @@ export const fetchEmployees = async () => {
  */
 export const fetchDepartments = async () => {
   try {
-    const response = await axios.get(
-      `${import.meta.env.VITE_BACKEND_URL}/api/department`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      }
-    );
-
+    const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/department`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
     if (response.data.success) {
       return response.data.departments;
     }
