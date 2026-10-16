@@ -2,7 +2,7 @@ import Payslip from "../models/Payslip.js";
 import ExpenseClaim from "../models/ExpenseClaim.js";
 import Employee from "../models/Employee.js";
 import { generatePayslipPdfBuffer } from "../services/pdfPayslipGenerator.js";
-import { asyncHandler, badRequest, conflict, forbidden, notFound } from "../middleware/errorHandler.js";
+import { ApiError, asyncHandler, badRequest, conflict, forbidden, notFound } from "../middleware/errorHandler.js";
 import { requireObjectId, toFiniteNumber, requireEnum } from "../utils/validate.js";
 import { now as clockNow } from "../services/clock.js";
 import { findEmployeeByAnyId, getEmployeeForUser, resolveEmployeeForCaller } from "../services/employeeScope.js";
@@ -164,6 +164,7 @@ export const autoGeneratePayslip = asyncHandler(async (req, res) => {
   const employee = await findEmployeeByAnyId(employeeRef);
   if (!employee) throw notFound("Employee not found");
   await employee.populate("userId"); // Need name
+  await employee.populate("department", "dep_name");
 
   if (await Payslip.exists({ employee: employee._id, month })) {
     throw conflict("A payslip for this employee and month already exists", "CONFLICT");
@@ -183,7 +184,7 @@ export const autoGeneratePayslip = asyncHandler(async (req, res) => {
   // Calculate Loss Of Pay (LOP)
   // Assuming a standard 22 working days per month (or calculate dynamically from monthAttendance)
   const totalWorkingDays = monthAttendance.length || 22;
-  const absentDays = monthAttendance.filter(a => a.status === "Absent" || a.status === "Leave").length;
+  const absentDays = monthAttendance.filter((a) => a.status === "Absent").length;
   
   const basicSalary = employee.salary || 0;
   let lossOfPay = 0;
@@ -239,6 +240,20 @@ export const autoGeneratePayslip = asyncHandler(async (req, res) => {
   }
 
   return res.status(201).json({ success: true, payslip: toDto(payslip, { forAdmin: true, now }) });
+});
+
+/* ================= DELETE PAYSLIP (ADMIN) ================= */
+export const deletePayslip = asyncHandler(async (req, res) => {
+  const payslipId = requireObjectId(req.params.payslipId, "payslipId");
+  const payslip = await Payslip.findById(payslipId);
+  if (!payslip) throw notFound("Payslip not found");
+
+  if (payslip.fileId && !(await removePayslipFile(payslip.fileId))) {
+    throw new ApiError(502, "Payslip PDF could not be deleted", "FILE_DELETE_FAILED");
+  }
+
+  await Payslip.deleteOne({ _id: payslip._id });
+  return res.json({ success: true });
 });
 
 /* ================= LISTS ================= */
