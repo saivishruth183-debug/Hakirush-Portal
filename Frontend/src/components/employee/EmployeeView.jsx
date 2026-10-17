@@ -2,6 +2,7 @@ import axios from "axios";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatTotalExperience } from "../../utils/employeeExperience";
 import {
   Calendar, ChevronLeft, ChevronRight, Fingerprint, Mail, Droplets, Briefcase, IdCard, CreditCard,
   PiggyBank, Heart, User, Pencil, Building2, X, Copy, Check, Eye, EyeOff, Cake, Clock,
@@ -212,9 +213,11 @@ const EmployeeView = () => {
   const bdayIn = daysToBirthday(employee.dob);
   const salary = Number(employee.salary || 0);
   const hasSalary = employee.salary !== undefined && employee.salary !== null && employee.salary !== "";
-  const experience = employee.experience !== undefined && employee.experience !== null && employee.experience !== ""
-    ? `${employee.experience} ${Number(employee.experience) === 1 ? "year" : "years"}`
-    : "";
+  const experience = formatTotalExperience(employee.experience, employee.dateOfJoining, {
+    isActive: employee.isActive ?? employee.userId?.isActive,
+    inactiveSince: employee.inactiveSince,
+    inactiveDurationMs: employee.inactiveDurationMs,
+  });
   const docCount = [employee.aadharcard, employee.pancard, employee.pfNumber].filter(Boolean).length;
   const editPath = `/admin-dashboard/employees/edit/${employee._id}`;
 
@@ -376,7 +379,7 @@ const EmployeeView = () => {
             <InfoRow icon={Briefcase} label="Designation" value={employee.designation} />
             <InfoRow icon={Building2} label="Department" value={dept?.dep_name} />
             <InfoRow icon={Calendar} label="Joined on" value={fmtDate(employee.dateOfJoining)} sub={tenureFrom(employee.dateOfJoining)} />
-            <InfoRow icon={Clock} label="Experience" value={experience} />
+            <InfoRow icon={Clock} label="Total experience" value={experience} />
           </Card>
 
           {/* documents */}
