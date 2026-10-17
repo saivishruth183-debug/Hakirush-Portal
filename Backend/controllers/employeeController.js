@@ -426,7 +426,7 @@ const setEmployeeStatus = asyncHandler(async (req, res) => {
   const b = req.body || {};
   const isActive = parseBoolean(b.isActive, "isActive", { optional: false });
   if (isActive) {
-    await reactivateUser(employee.userId);
+    await reactivateUser(employee.userId, employee._id);
   } else {
     await deactivateEmployee(
       employee,
