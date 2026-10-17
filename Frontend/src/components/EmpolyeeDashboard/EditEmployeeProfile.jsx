@@ -307,7 +307,7 @@ const EditEmployeeProfile = () => {
               />
               <EditField
                 icon={<Briefcase size={14} strokeWidth={1.5} />}
-                label="Experience (Years)"
+                label="Prior Experience (Years)"
                 type="number"
                 value={experience}
                 onChange={(e) => setExperience(e.target.value)}
