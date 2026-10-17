@@ -1,7 +1,128 @@
 import Client from "../models/Client.js";
 import User from "../models/User.js";
+import ClientGalleryImage, { GALLERY_CAPTION_MAX } from "../models/ClientGalleryImage.js";
+import ClientStanding, { STANDINGS_MAX_ROWS, TEAM_NAME_MAX } from "../models/ClientStanding.js";
 import bcrypt from "bcrypt";
-import uploadToImageKit from "../utils/uploadToImageKit.js";
+import uploadToImageKit, { deleteFromImageKit, getImageKitClient } from "../utils/uploadToImageKit.js";
+import { ApiError, asyncHandler } from "../middleware/errorHandler.js";
+
+const CLIENT_GALLERY_MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+const CLIENT_GALLERY_FOLDER = "client-gallery";
+
+const lastMonthKey = (now = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: process.env.ORG_TIMEZONE || "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const previous = new Date(Date.UTC(year, month - 2, 1));
+  return `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}`;
+};
+
+const isValidMonth = (month) => typeof month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+
+const getImageKitUploadAuth = () => {
+  if (!process.env.IMAGEKIT_PUBLIC_KEY || !process.env.IMAGEKIT_PRIVATE_KEY) {
+    throw new ApiError(503, "Image uploads are not configured", "UPLOAD_UNAVAILABLE");
+  }
+  const expire = Math.floor(Date.now() / 1000) + 5 * 60;
+  const authenticationParameters = getImageKitClient().getAuthenticationParameters(undefined, expire);
+  if (!authenticationParameters.signature) {
+    throw new ApiError(503, "Image uploads are not configured", "UPLOAD_UNAVAILABLE");
+  }
+  return {
+    success: true,
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+    uploadEndpoint: "https://upload.imagekit.io/api/v1/files/upload",
+    folder: CLIENT_GALLERY_FOLDER,
+    maxFileBytes: CLIENT_GALLERY_MAX_IMAGE_BYTES,
+    authenticationParameters,
+  };
+};
+
+const verifyGalleryUpload = async (fileId) => {
+  let stored;
+  try {
+    stored = await getImageKitClient().getFileDetails(fileId);
+  } catch (error) {
+    console.error("[IMAGEKIT] gallery file verification failed:", error?.message || "unknown error");
+    throw new ApiError(502, "Could not verify uploaded image", "UPLOAD_VERIFICATION_FAILED");
+  }
+
+  if (
+    stored.fileId !== fileId ||
+    typeof stored.filePath !== "string" ||
+    !stored.filePath.startsWith(`/${CLIENT_GALLERY_FOLDER}/`)
+  ) {
+    throw new ApiError(400, "Uploaded file is not in the client gallery", "INVALID_UPLOAD");
+  }
+  if (stored.fileType !== "image") {
+    await deleteFromImageKit(fileId);
+    throw new ApiError(415, "Only image files are allowed", "UNSUPPORTED_FILE");
+  }
+  if (!Number.isSafeInteger(stored.size) || stored.size > CLIENT_GALLERY_MAX_IMAGE_BYTES) {
+    await deleteFromImageKit(fileId);
+    throw new ApiError(413, "Image must be 50 MB or smaller", "FILE_TOO_LARGE");
+  }
+
+  try {
+    const endpoint = new URL(process.env.IMAGEKIT_URL_ENDPOINT);
+    const uploadedUrl = new URL(stored.url);
+    const endpointPath = endpoint.pathname.replace(/\/+$/, "");
+    if (
+      endpoint.protocol !== "https:" ||
+      uploadedUrl.origin !== endpoint.origin ||
+      !uploadedUrl.pathname.startsWith(`${endpointPath}/${CLIENT_GALLERY_FOLDER}/`)
+    ) {
+      throw new Error("Uploaded image URL is outside the configured ImageKit gallery");
+    }
+    return { filePath: stored.filePath, url: uploadedUrl.toString() };
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(503, "Image uploads are not configured", "UPLOAD_UNAVAILABLE");
+    }
+    throw new ApiError(400, "Uploaded image URL is invalid", "INVALID_UPLOAD");
+  }
+};
+
+const getStandingsForClient = async (clientId) => {
+  const record = await ClientStanding.findOne({ clientId }).lean();
+  return {
+    success: true,
+    standings: record?.standings || [],
+    updatedAt: record?.updatedAt || null,
+  };
+};
+
+const validateStandings = (standings) => {
+  if (!Array.isArray(standings) || standings.length > STANDINGS_MAX_ROWS) {
+    throw new ApiError(400, `Standings must contain 0-${STANDINGS_MAX_ROWS} rows`, "VALIDATION_ERROR");
+  }
+  const seen = new Set();
+  return standings.map((row, index) => {
+    const teamName = typeof row?.teamName === "string" ? row.teamName.trim() : "";
+    if (!teamName || teamName.length > TEAM_NAME_MAX) {
+      throw new ApiError(400, `Row ${index + 1}: team name must be 1-${TEAM_NAME_MAX} characters`, "VALIDATION_ERROR");
+    }
+    const key = teamName.toLocaleLowerCase();
+    if (seen.has(key)) throw new ApiError(400, `Row ${index + 1}: duplicate team name`, "VALIDATION_ERROR");
+    seen.add(key);
+
+    const numbers = {};
+    for (const field of ["played", "won", "lost", "points"]) {
+      if (!Number.isSafeInteger(row[field]) || row[field] < 0) {
+        throw new ApiError(400, `Row ${index + 1}: ${field} must be a non-negative whole number`, "VALIDATION_ERROR");
+      }
+      numbers[field] = row[field];
+    }
+    if (numbers.won + numbers.lost > numbers.played) {
+      throw new ApiError(400, `Row ${index + 1}: won + lost cannot exceed played`, "VALIDATION_ERROR");
+    }
+    return { teamName, ...numbers };
+  });
+};
 
 /* ================= ADD CLIENT ================= */
 const addClient = async (req, res) => {
@@ -159,15 +280,12 @@ const deleteClient = async (req, res) => {
 
 const getClientPerformance = async (req, res) => {
   try {
-    const { userId } = req.query;
-    const performanceData = [
-      { teamName: "Super Teacher", played: 12, won: 10, lost: 2, points: 30 },
-      { teamName: "Delta Strikers", played: 12, won: 5, lost: 7, points: 15 },
-      { teamName: "Titan Shadows", played: 12, won: 8, lost: 4, points: 24 },
-      { teamName: "Omega Blitz", played: 12, won: 3, lost: 9, points: 9 },
-      { teamName: "Apex Predators", played: 12, won: 9, lost: 3, points: 27 },
-    ];
-    res.json({ success: true, performance: performanceData });
+    const userId = req.user.role === "admin" ? req.query.userId : req.user._id;
+    if (!userId) return res.status(400).json({ success: false, error: "userId is required" });
+    const client = await Client.findOne({ userId });
+    if (!client) return res.status(404).json({ success: false, error: "Client not found" });
+    const result = await getStandingsForClient(client._id);
+    return res.json({ success: true, performance: result.standings, updatedAt: result.updatedAt });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -176,20 +294,171 @@ const getClientPerformance = async (req, res) => {
 /* ================= GET CLIENT IMAGES ================= */
 const getClientImages = async (req, res) => {
   try {
-    const { userId } = req.query;
+    const requestedUserId = req.query.userId;
+    const userId = req.user.role === "admin" ? requestedUserId : req.user.id;
     if (!userId) {
       return res.status(400).json({ success: false, error: "userId is required" });
+    }
+    if (req.user.role !== "admin" && String(userId) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, error: "Access denied", code: "FORBIDDEN" });
     }
     const client = await Client.findOne({ userId });
     if (!client) {
       return res.status(404).json({ success: false, error: "Client not found" });
     }
-    // If images field does not exist, return empty array
-    res.json({ success: true, images: client.images || [] });
+    const images = await ClientGalleryImage.find({ clientId: client._id })
+      .sort({ createdAt: -1 })
+      .select("url");
+    res.json({ success: true, images: images.map((image) => image.url) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+const getClientGallery = asyncHandler(async (req, res) => {
+  const client = await Client.findById(req.params.id);
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  const images = await ClientGalleryImage.find({
+    clientId: req.params.id,
+    $or: [{ audience: "client" }, { audience: { $exists: false } }],
+  }).sort({ createdAt: -1 });
+  return res.json({ success: true, images });
+});
+
+const getClientGalleryUploadAuth = asyncHandler(async (req, res) => {
+  const client = await Client.findById(req.params.id);
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  return res.json(getImageKitUploadAuth());
+});
+
+const getSharedGalleryUploadAuth = asyncHandler(async (req, res) =>
+  res.json(getImageKitUploadAuth())
+);
+
+const getMyClientGallery = asyncHandler(async (req, res) => {
+  const client = await Client.findOne({ userId: req.user._id });
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  const galleryMonth = lastMonthKey();
+  const [images, sharedImages] = await Promise.all([
+    ClientGalleryImage.find({
+      clientId: client._id,
+      $or: [{ audience: "client" }, { audience: { $exists: false } }],
+    }).sort({ createdAt: -1 }),
+    ClientGalleryImage.find({ audience: "allClients", galleryMonth }).sort({ createdAt: -1 }),
+  ]);
+  return res.json({ success: true, images, sharedImages, galleryMonth });
+});
+
+const uploadClientGalleryImage = asyncHandler(async (req, res) => {
+  const client = await Client.findById(req.params.id);
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+
+  const caption = req.body.caption ?? "";
+  if (typeof caption !== "string" || caption.trim().length > GALLERY_CAPTION_MAX) {
+    throw new ApiError(400, `Caption must be ${GALLERY_CAPTION_MAX} characters or fewer`, "VALIDATION_ERROR");
+  }
+
+  const fileId = req.body.fileId;
+  if (typeof fileId !== "string" || !fileId.trim()) {
+    throw new ApiError(400, "Uploaded image is required", "VALIDATION_ERROR");
+  }
+
+  const stored = await verifyGalleryUpload(fileId);
+
+  try {
+    const image = await ClientGalleryImage.create({
+      clientId: client._id,
+      url: stored.url,
+      fileId,
+      filePath: stored.filePath,
+      caption: caption.trim(),
+      uploadedBy: req.user._id,
+    });
+    return res.status(201).json({ success: true, image });
+  } catch (error) {
+    await deleteFromImageKit(fileId);
+    throw error;
+  }
+});
+
+const getSharedGallery = asyncHandler(async (req, res) => {
+  const month = req.query.month;
+  if (!isValidMonth(month)) throw new ApiError(400, "month must use YYYY-MM format", "VALIDATION_ERROR");
+  const images = await ClientGalleryImage.find({ audience: "allClients", galleryMonth: month }).sort({ createdAt: -1 });
+  return res.json({ success: true, images, galleryMonth: month });
+});
+
+const uploadSharedGalleryImage = asyncHandler(async (req, res) => {
+  const { fileId, caption = "", month } = req.body;
+  if (!isValidMonth(month)) throw new ApiError(400, "month must use YYYY-MM format", "VALIDATION_ERROR");
+  if (typeof caption !== "string" || caption.trim().length > GALLERY_CAPTION_MAX) {
+    throw new ApiError(400, `Caption must be ${GALLERY_CAPTION_MAX} characters or fewer`, "VALIDATION_ERROR");
+  }
+  if (typeof fileId !== "string" || !fileId.trim()) {
+    throw new ApiError(400, "Uploaded image is required", "VALIDATION_ERROR");
+  }
+
+  const stored = await verifyGalleryUpload(fileId);
+  try {
+    const image = await ClientGalleryImage.create({
+      audience: "allClients",
+      galleryMonth: month,
+      url: stored.url,
+      fileId,
+      filePath: stored.filePath,
+      caption: caption.trim(),
+      uploadedBy: req.user._id,
+    });
+    return res.status(201).json({ success: true, image });
+  } catch (error) {
+    await deleteFromImageKit(fileId);
+    throw error;
+  }
+});
+
+const deleteSharedGalleryImage = asyncHandler(async (req, res) => {
+  const image = await ClientGalleryImage.findOneAndDelete({
+    _id: req.params.imageId,
+    audience: "allClients",
+  });
+  if (!image) throw new ApiError(404, "Shared gallery image not found", "NOT_FOUND");
+  await deleteFromImageKit(image.fileId);
+  return res.json({ success: true, message: "Image deleted" });
+});
+
+const getMyClientPerformance = asyncHandler(async (req, res) => {
+  const client = await Client.findOne({ userId: req.user._id });
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  return res.json(await getStandingsForClient(client._id));
+});
+
+const getClientStandings = asyncHandler(async (req, res) => {
+  const client = await Client.findById(req.params.id);
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  return res.json(await getStandingsForClient(client._id));
+});
+
+const updateClientStandings = asyncHandler(async (req, res) => {
+  const client = await Client.findById(req.params.id);
+  if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
+  const standings = validateStandings(req.body?.standings);
+  const record = await ClientStanding.findOneAndUpdate(
+    { clientId: client._id },
+    { $set: { standings, updatedBy: req.user._id } },
+    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+  );
+  return res.json({ success: true, standings: record.standings, updatedAt: record.updatedAt });
+});
+
+const deleteClientGalleryImage = asyncHandler(async (req, res) => {
+  const image = await ClientGalleryImage.findOneAndDelete({
+    _id: req.params.imageId,
+    clientId: req.params.id,
+  });
+  if (!image) throw new ApiError(404, "Gallery image not found", "NOT_FOUND");
+  await deleteFromImageKit(image.fileId);
+  return res.json({ success: true, message: "Image deleted" });
+});
 
 export {
   addClient,
@@ -200,4 +469,16 @@ export {
   deleteClient,
   getClientPerformance,
   getClientImages,
+  getClientGallery,
+  getClientGalleryUploadAuth,
+  getSharedGalleryUploadAuth,
+  getMyClientGallery,
+  uploadClientGalleryImage,
+  getSharedGallery,
+  uploadSharedGalleryImage,
+  deleteSharedGalleryImage,
+  getMyClientPerformance,
+  getClientStandings,
+  updateClientStandings,
+  deleteClientGalleryImage,
 } 
