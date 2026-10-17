@@ -1,168 +1,167 @@
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Edit2, Trash2, Eye, AlertCircle, Check } from "lucide-react";
-import { useState } from "react";
+import { Edit2, Trash2, Eye, AlertTriangle, Check, X, Loader2, ShieldAlert, FileX2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { apiErrorMessage } from "./apiError";
 
-const CHARCOAL = "#1A1A1D";
-const GOLD = "#AD8A56";
-const CRIMSON = "#9E2B3E";
-const IVORY = "#F6F2EA";
-const SLATE = "#7A756C";
-const HAIRLINE = "rgba(26,26,29,0.12)";
-const GOLD_HAIRLINE = "rgba(173,138,86,0.35)";
+const AUTO_CLOSE_MS = 1200;
 
-const displayFont = { fontFamily: "'Cormorant Garamond', 'Georgia', serif" };
-const bodyFont = { fontFamily: "'Inter', 'Helvetica Neue', sans-serif" };
+/* ================= MODAL SHELL ================= */
+const Modal = ({ children, onClose, dismissable = true }) => {
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && dismissable && onClose?.();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, dismissable]);
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[70] flex items-end justify-center p-4 sm:items-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    >
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => dismissable && onClose?.()} />
+      <motion.div
+        role="dialog" aria-modal="true"
+        initial={{ y: 40, opacity: 0, scale: 0.96 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 30, opacity: 0, scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 340, damping: 28 }}
+        className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white p-7 text-left shadow-2xl ring-1 ring-gray-100"
+      >
+        {children}
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+};
+
+const ModalIcon = ({ tone, children }) => (
+  <motion.div
+    initial={{ scale: 0.5, rotate: -12 }} animate={{ scale: 1, rotate: 0 }}
+    transition={{ type: "spring", stiffness: 260, damping: 14, delay: 0.05 }}
+    className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ring-1 ${tone}`}
+  >
+    {children}
+  </motion.div>
+);
 
 /* ================= CONFIRM DELETE ================= */
-const ConfirmDeleteAlert = ({ onConfirm, onCancel }) => {
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[60] bg-[#1A1A1D]/30 backdrop-blur-md" />
-      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-md overflow-hidden rounded-[1.25rem] border bg-white/95 shadow-[0_40px_90px_-32px_rgba(26,26,29,0.4)] backdrop-blur-md"
-          style={{ borderColor: HAIRLINE, ...bodyFont }}
-        >
-          <div className="px-8 pb-8 pt-10">
-            <div
-              className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-              style={{ borderColor: "rgba(158,43,62,0.3)", color: CRIMSON }}
-            >
-              <AlertCircle size={26} strokeWidth={1.75} />
-            </div>
+const ConfirmDeleteAlert = ({ onConfirm, onCancel, busy }) => (
+  <Modal onClose={onCancel} dismissable={!busy}>
+    <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-red-600 to-rose-400" />
+    <ModalIcon tone="bg-red-50 text-red-600 ring-red-100"><Trash2 size={28} strokeWidth={2.2} /></ModalIcon>
+    <h3 className="text-center text-xl font-extrabold tracking-tight text-gray-900">
+      Delete this <span className="text-red-600">client?</span>
+    </h3>
+    <p className="mt-2 text-center text-sm text-gray-500">This permanently removes the client record.</p>
 
-            <div className="mb-8 space-y-2 text-center">
-              <h3 className="text-2xl leading-none" style={{ ...displayFont, fontWeight: 500, color: CHARCOAL }}>
-                Remove Client Record?
-              </h3>
-              <p className="text-xs leading-relaxed" style={{ color: SLATE }}>
-                This will permanently delete the record from the registry.
-              </p>
-            </div>
+    <ul className="mt-5 space-y-2 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
+      {[
+        [ShieldAlert, "Their login will stop working"],
+        [Users, "Linked roster and plan details may be removed"],
+        [FileX2, "This can't be undone"],
+      ].map(([Icon, text]) => (
+        <li key={text} className="flex items-center gap-2.5 text-xs font-medium text-gray-600">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white text-red-500 shadow-sm"><Icon size={13} /></span>
+          {text}
+        </li>
+      ))}
+    </ul>
 
-            <div className="flex gap-3">
-              <button
-                onClick={onCancel}
-                className="w-1/2 cursor-pointer rounded-full border py-3.5 text-[10px] font-semibold uppercase tracking-widest transition-colors"
-                style={{ borderColor: HAIRLINE, color: SLATE }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                className="w-1/2 cursor-pointer rounded-full py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: CRIMSON }}
-              >
-                Confirm Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-};
+    <div className="mt-6 grid grid-cols-2 gap-2">
+      <button
+        onClick={onCancel} disabled={busy}
+        className="rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onConfirm} disabled={busy}
+        className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
+      >
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+        {busy ? "Deleting…" : "Delete"}
+      </button>
+    </div>
+  </Modal>
+);
 
 /* ================= SUCCESS ================= */
-const DeleteSuccessAlert = ({ onClose }) => {
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-[60] bg-[#1A1A1D]/20 backdrop-blur-sm" />
-      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
-        <div
-          className="w-full max-w-sm overflow-hidden rounded-[1.25rem] border bg-white/95 p-8 text-center shadow-[0_40px_90px_-32px_rgba(26,26,29,0.4)] backdrop-blur-md"
-          style={{ borderColor: HAIRLINE, ...bodyFont }}
-        >
-          <div
-            className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border"
-            style={{ borderColor: GOLD_HAIRLINE, color: GOLD }}
-          >
-            <Check size={26} strokeWidth={1.75} />
-          </div>
-          <h3 className="mb-2 text-xl leading-none" style={{ ...displayFont, fontWeight: 500, color: CHARCOAL }}>
-            Record Removed
-          </h3>
-          <p className="mb-6 text-xs" style={{ color: SLATE }}>
-            The registry has been updated.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full cursor-pointer rounded-full py-3.5 text-[10px] font-semibold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: CHARCOAL }}
-          >
-            Acknowledge
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-};
+const DeleteSuccessAlert = ({ onClose }) => (
+  <Modal onClose={onClose}>
+    <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-400" />
+    <ModalIcon tone="bg-emerald-50 text-emerald-600 ring-emerald-100"><Check size={30} strokeWidth={2.5} /></ModalIcon>
+    <h3 className="text-center text-xl font-extrabold tracking-tight text-gray-900">Client deleted</h3>
+    <p className="mt-2 text-center text-sm text-gray-500">The directory has been updated.</p>
+    <div className="mt-5 h-1 overflow-hidden rounded-full bg-gray-100">
+      <motion.div
+        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400"
+        initial={{ width: "100%" }} animate={{ width: "0%" }}
+        transition={{ duration: AUTO_CLOSE_MS / 1000, ease: "linear" }}
+      />
+    </div>
+  </Modal>
+);
+
+/* ================= ERROR ================= */
+const ErrorAlert = ({ message, onClose }) => (
+  <Modal onClose={onClose}>
+    <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-red-600 to-rose-400" />
+    <button onClick={onClose} aria-label="Close" className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+      <X size={16} />
+    </button>
+    <ModalIcon tone="bg-red-50 text-red-600 ring-red-100"><AlertTriangle size={28} /></ModalIcon>
+    <h3 className="text-center text-xl font-extrabold tracking-tight text-gray-900">Couldn't delete</h3>
+    <p className="mt-2 text-center text-sm leading-relaxed text-gray-500">{message}</p>
+    <button
+      onClick={onClose}
+      className="mt-6 w-full rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:brightness-110 active:scale-[0.98]"
+    >
+      Got it
+    </button>
+  </Modal>
+);
 
 /* ================= ICON BUTTON WITH TOOLTIP ================= */
-const IconButton = ({ icon, label, onClick, variant = "view" }) => {
-  const [hovered, setHovered] = useState(false);
-
-  const variants = {
-    view: {
-      style: { borderColor: HAIRLINE, color: SLATE, backgroundColor: "transparent" },
-      hoverStyle: { borderColor: GOLD_HAIRLINE, color: GOLD, backgroundColor: "transparent" },
-      base: "cursor-pointer rounded-full border p-2.5 transition-colors",
-    },
-    edit: {
-      style: { borderColor: HAIRLINE, color: SLATE, backgroundColor: "transparent" },
-      hoverStyle: { borderColor: "rgba(26,26,29,0.3)", color: CHARCOAL, backgroundColor: "transparent" },
-      base: "cursor-pointer rounded-full border p-2.5 transition-colors",
-    },
-    danger: {
-      style: { color: SLATE, backgroundColor: IVORY },
-      hoverStyle: { color: "#fff", backgroundColor: CRIMSON },
-      base: "cursor-pointer rounded-full p-2.5 transition-colors",
-    },
-  };
-
-  const v = variants[variant];
-
-  return (
-    <div className="relative">
-      <button
-        onClick={onClick}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        className={v.base}
-        style={hovered ? v.hoverStyle : v.style}
-        aria-label={label}
-      >
-        {icon}
-      </button>
-
-      <span
-        className={`pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2.5 py-1 text-[9.5px] font-semibold uppercase tracking-widest text-white transition-all duration-200 ${
-          hovered ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-        }`}
-        style={{ backgroundColor: CHARCOAL, ...bodyFont }}
-      >
-        {label}
-        <span
-          className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent"
-          style={{ borderTopColor: CHARCOAL }}
-        />
-      </span>
-    </div>
-  );
+const VARIANTS = {
+  view: "bg-sky-50 text-sky-600 ring-sky-100 hover:bg-sky-500 hover:text-white hover:ring-sky-500 hover:shadow-sky-500/30",
+  edit: "bg-amber-50 text-amber-600 ring-amber-100 hover:bg-amber-500 hover:text-white hover:ring-amber-500 hover:shadow-amber-500/30",
+  danger: "bg-red-50 text-red-600 ring-red-100 hover:bg-red-600 hover:text-white hover:ring-red-600 hover:shadow-red-600/30",
 };
+
+const IconButton = ({ icon, label, onClick, variant = "view", disabled }) => (
+  <div className="group/btn relative">
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.92 }}
+      className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-colors duration-200 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]}`}
+      aria-label={label}
+    >
+      {icon}
+    </motion.button>
+    <span className="pointer-events-none absolute -top-9 left-1/2 z-30 -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow-lg transition-all duration-150 group-hover/btn:translate-y-0 group-hover/btn:opacity-100">
+      {label}
+      <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+    </span>
+  </div>
+);
 
 /* ================= MAIN BUTTONS ================= */
 export const ClientButtons = ({ id, refresh }) => {
   const navigate = useNavigate();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const deleteClient = async () => {
+    if (deleting) return;
+    setDeleting(true);
     try {
       const response = await axios.delete(
         `${import.meta.env.VITE_BACKEND_URL}/api/client/${id}`,
@@ -180,46 +179,55 @@ export const ClientButtons = ({ id, refresh }) => {
         setTimeout(() => {
           setShowSuccess(false);
           if (refresh) refresh();
-        }, 1200);
+        }, AUTO_CLOSE_MS);
       }
     } catch (err) {
       console.error(err);
-      alert(apiErrorMessage(err, "System Error: Unable to delete client record."));
+      setShowConfirm(false);
+      setErrorMsg(apiErrorMessage(err, "System Error: Unable to delete client record."));
+    } finally {
+      setDeleting(false);
     }
   };
 
   return (
     <>
-      {showConfirm && (
-        <ConfirmDeleteAlert
-          onConfirm={deleteClient}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
+      <AnimatePresence>
+        {showConfirm && (
+          <ConfirmDeleteAlert
+            key="confirm"
+            busy={deleting}
+            onConfirm={deleteClient}
+            onCancel={() => setShowConfirm(false)}
+          />
+        )}
+        {showSuccess && (
+          <DeleteSuccessAlert key="success" onClose={() => setShowSuccess(false)} />
+        )}
+        {errorMsg && (
+          <ErrorAlert key="error" message={errorMsg} onClose={() => setErrorMsg("")} />
+        )}
+      </AnimatePresence>
 
-      {showSuccess && (
-        <DeleteSuccessAlert onClose={() => setShowSuccess(false)} />
-      )}
-
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-1.5">
         <IconButton
           variant="view"
           label="View profile"
-          icon={<Eye size={15} strokeWidth={1.75} />}
+          icon={<Eye size={16} />}
           onClick={() => navigate(`/admin-dashboard/clients/${id}`)}
         />
-
         <IconButton
           variant="edit"
-          label="Edit record"
-          icon={<Edit2 size={15} strokeWidth={1.75} />}
+          label="Edit client"
+          icon={<Edit2 size={15} />}
           onClick={() => navigate(`/admin-dashboard/clients/edit/${id}`)}
         />
-
+        <span className="mx-0.5 h-6 w-px bg-gray-200" aria-hidden="true" />
         <IconButton
           variant="danger"
-          label="Delete record"
-          icon={<Trash2 size={15} strokeWidth={1.75} />}
+          label="Delete client"
+          icon={<Trash2 size={15} />}
+          disabled={deleting}
           onClick={() => setShowConfirm(true)}
         />
       </div>
