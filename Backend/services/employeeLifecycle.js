@@ -21,7 +21,18 @@ export const deactivateUser = async (userId) => {
   await revokeAllForUser(userId, "deactivated");
 };
 
-export const reactivateUser = async (userId) => {
+export const reactivateUser = async (userId, employeeId) => {
+  const employee = await Employee.findById(employeeId).select("inactiveSince").lean();
+  if (employee?.inactiveSince) {
+    const inactiveSince = employee.inactiveSince;
+    await Employee.updateOne(
+      { _id: employeeId, inactiveSince },
+      {
+        $inc: { inactiveDurationMs: Math.max(0, Date.now() - inactiveSince.getTime()) },
+        $unset: { inactiveSince: 1 },
+      }
+    );
+  }
   await User.updateOne({ _id: userId }, { $set: { isActive: true } });
 };
 
@@ -140,5 +151,13 @@ export const deactivateEmployee = async (employee, options, actorUserId) => {
   if (!user) throw new ApiError(404, "Employee account not found", "NOT_FOUND");
   // Even if already inactive, a stale manager assignment must be resolved explicitly.
   const plan = await planManagerHandoff(employee, options, "deactivation");
-  await withManagerHandoff(plan, actorUserId, () => deactivateUser(employee.userId));
+  await withManagerHandoff(plan, actorUserId, async () => {
+    if (user.isActive !== false) {
+      await Employee.updateOne(
+        { _id: employee._id, inactiveSince: null },
+        { $set: { inactiveSince: new Date() } }
+      );
+    }
+    await deactivateUser(employee.userId);
+  });
 };
