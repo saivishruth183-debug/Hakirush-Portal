@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const sponsorSchema = new mongoose.Schema(
   {
+    sponsorId: { type: String, required: true, trim: true, maxlength: 100, unique: true, sparse: true },
     name: { type: String, required: true },
 
     collaboration: {
