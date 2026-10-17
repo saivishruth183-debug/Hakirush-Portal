@@ -212,6 +212,13 @@ const AdminSummary = () => {
 
   const unseen = notifications.filter((n) => !n.seen).length;
 
+  // show the unread count in the browser tab, e.g. "(3) Admin Dashboard"
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\)\s*/, "");
+    document.title = unseen > 0 ? `(${unseen > 99 ? "99+" : unseen}) ${base}` : base;
+    return () => { document.title = document.title.replace(/^\(\d+\+?\)\s*/, ""); };
+  }, [unseen]);
+
   const fetchAll = useCallback(async () => {
     try {
       const [d, a] = await Promise.all([
@@ -410,18 +417,44 @@ const AdminSummary = () => {
 
             {/* Notifications */}
             <div className="relative">
-              <button
-                aria-label="Notifications"
+              <motion.button
+                layout
+                aria-label={unseen > 0 ? `Notifications, ${unseen} unread` : "Notifications"}
+                title={unseen > 0 ? `${unseen} unread notification${unseen > 1 ? "s" : ""}` : "Notifications"}
                 onClick={() => setShowNotif((v) => !v)}
-                className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 transition ${showNotif ? "text-red-600 ring-red-200" : "text-gray-500 ring-gray-100 hover:text-red-600"}`}
+                className={`relative flex h-10 items-center justify-center gap-1.5 rounded-full shadow-sm ring-1 transition-colors ${
+                  unseen > 0
+                    ? "bg-gradient-to-r from-red-600 to-rose-500 pl-3 pr-1.5 text-white shadow-red-600/30 ring-red-500 hover:brightness-110"
+                    : `w-10 bg-white ${showNotif ? "text-red-600 ring-red-200" : "text-gray-500 ring-gray-100 hover:text-red-600"}`
+                }`}
               >
-                <Bell size={17} />
                 {unseen > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
-                    {unseen > 9 ? "9+" : unseen}
-                  </span>
+                  <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-red-500 opacity-20 [animation-duration:2.5s]" />
                 )}
-              </button>
+                <motion.span
+                  key={`bell-${unseen}`}
+                  initial={unseen > 0 ? { rotate: -18 } : false}
+                  animate={{ rotate: [-18, 14, -8, 4, 0] }}
+                  transition={{ duration: 0.6 }}
+                  className="relative flex"
+                >
+                  <Bell size={17} />
+                </motion.span>
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {unseen > 0 && (
+                    <motion.span
+                      key={unseen}
+                      initial={{ scale: 0.4, opacity: 0, y: -6 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{ scale: 0.4, opacity: 0, y: 6 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                      className="relative flex h-7 min-w-[28px] items-center justify-center rounded-full bg-white px-2 text-xs font-extrabold tabular-nums text-red-600 shadow-sm"
+                    >
+                      {unseen > 99 ? "99+" : unseen}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
 
               <AnimatePresence>
               {showNotif && (
@@ -435,7 +468,11 @@ const AdminSummary = () => {
                     <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                       <div>
                         <p className="font-bold text-gray-900">Notifications</p>
-                        <p className="text-xs text-gray-400">{unseen ? `${unseen} unread` : "You're all caught up"}</p>
+                        <p className="flex items-center gap-1.5 text-xs text-gray-400">
+                          {unseen ? (
+                            <><span className="rounded-full bg-red-600 px-1.5 py-px text-[10px] font-bold tabular-nums text-white">{unseen}</span> unread of {notifications.length}</>
+                          ) : "You're all caught up"}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1">
                         {unseen > 0 && (
@@ -458,7 +495,9 @@ const AdminSummary = () => {
                           {notifTab === key && (
                             <motion.span layoutId="notif-tab" className="absolute inset-0 rounded-full bg-red-50" transition={{ type: "spring", stiffness: 400, damping: 32 }} />
                           )}
-                          <span className="relative">{label} <span className="opacity-60">{n}</span></span>
+                          <span className="relative flex items-center gap-1.5">{label}
+                            <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${key === "unread" && n > 0 ? "bg-red-600 text-white" : "bg-gray-100 text-gray-500"}`}>{n}</span>
+                          </span>
                         </button>
                       ))}
                     </div>
