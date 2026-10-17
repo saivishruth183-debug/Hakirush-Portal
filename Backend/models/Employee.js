@@ -14,6 +14,8 @@ const employeeSchema = new Schema(
     gender: { type: String },
     maritalStatus: { type: String },
     dateOfJoining: { type: Date, default: Date.now },
+    inactiveSince: { type: Date, default: null },
+    inactiveDurationMs: { type: Number, default: 0, min: 0 },
     bloodGroup: {
       type: String,
       enum: [...BLOOD_GROUPS, null],
