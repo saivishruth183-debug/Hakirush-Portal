@@ -23,7 +23,7 @@ const COLLABS = [
   { value: "Event Sponsor", blurb: "Backs specific events", icon: CalendarCheck2, tone: "from-amber-500 to-orange-400" },
   { value: "Media Partner", blurb: "Coverage, promotion & reach", icon: Radio, tone: "from-sky-500 to-cyan-400" },
 ];
-const FIELD_LABELS = { name: "Sponsor name", collaboration: "Collaboration", eventsSponsored: "Events sponsored", reach: "Market reach", upcomingEvents: "Upcoming events" };
+const FIELD_LABELS = { sponsorId: "Sponsor ID", name: "Sponsor name", collaboration: "Collaboration", eventsSponsored: "Events sponsored", reach: "Market reach", upcomingEvents: "Upcoming events" };
 
 const initialsOf = (name = "") => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 const clip = (v, n = 60) => (v && v.length > n ? `${v.slice(0, n)}…` : v);
@@ -111,6 +111,7 @@ const SponsorEdit = () => {
   const navigate = useNavigate();
 
   const [client, setClient] = useState({
+    sponsorId: "",
     name: "",
     collaboration: "",
     eventsSponsored: "",
@@ -151,6 +152,7 @@ const SponsorEdit = () => {
       if (res.data.success) {
         const s = res.data.sponsor;
         const values = {
+          sponsorId: s.sponsorId || "",
           name: s.name || "",
           collaboration: s.collaboration || "",
           eventsSponsored: s.eventsSponsored || "",
@@ -232,6 +234,7 @@ const SponsorEdit = () => {
   }, [dirty, showAlert]);
 
   const errors = {
+    sponsorId: !client.sponsorId?.trim() ? "Sponsor ID is required" : "",
     name: !client.name?.trim() ? "Sponsor name is required" : "",
     collaboration: !client.collaboration ? "Choose a collaboration type" : "",
     eventsSponsored: client.eventsSponsored !== "" &&
@@ -242,7 +245,7 @@ const SponsorEdit = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (saving) return;
-    setTouched({ name: true, collaboration: true, eventsSponsored: true });
+    setTouched({ sponsorId: true, name: true, collaboration: true, eventsSponsored: true });
     const firstErr = Object.values(errors).find(Boolean);
     if (firstErr) {
       setError({ title: "Check the form", message: `${firstErr}.` });
@@ -433,6 +436,23 @@ const SponsorEdit = () => {
           <div className="space-y-5 lg:col-span-8">
             <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-5 sm:p-6`}>
               <SectionTitle icon={<Building2 size={15} />} title="Sponsor details" subtitle="Who they are and how they partner with you" />
+              <div className="mt-5">
+                <FieldHeader label="Sponsor ID" required changed={isChanged("sponsorId")} onReset={() => resetField("sponsorId")} />
+                <div className="group relative">
+                  <Hash size={16} className={`pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 transition ${showErr("sponsorId") ? "text-red-400" : "text-gray-400 group-focus-within:text-red-500"}`} />
+                  <input
+                    name="sponsorId"
+                    value={client.sponsorId}
+                    onChange={handleChange}
+                    onBlur={() => setTouched((t) => ({ ...t, sponsorId: true }))}
+                    placeholder="e.g. SP-2026-001"
+                    maxLength={100}
+                    required
+                    className={inputCls(showErr("sponsorId"), isChanged("sponsorId"))}
+                  />
+                </div>
+                <FieldError msg={showErr("sponsorId")} />
+              </div>
               <div className="mt-5">
                 <FieldHeader label="Sponsor name" required changed={isChanged("name")} onReset={() => resetField("name")} />
                 <div className="group relative">
