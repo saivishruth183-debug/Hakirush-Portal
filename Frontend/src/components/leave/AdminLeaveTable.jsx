@@ -1,21 +1,34 @@
 import axios from "axios";
 import React, { useEffect, useState, useMemo } from "react";
-import { Eye, ChevronLeft, ChevronRight, ChevronDown, Search, ClipboardList, Calendar, CalendarClock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Eye, ChevronLeft, ChevronRight, Search, ClipboardList, CalendarClock, X, Hash, Briefcase,
+  Clock3, CheckCircle2, XCircle, ListFilter, Inbox, ArrowRight, Info, RefreshCw,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 /* ===== STYLES & HELPERS ===== */
-const INK = "#1C1A17";
-const GARNET = "#7A2233";
-const GOLD = "#B8912E";
-const HAIRLINE = "#E7E1D3";
-const RUST = "#A24A32";
+const PAGE_BG =
+  "bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)]";
+const CARD =
+  "rounded-3xl bg-white/90 ring-1 ring-white/70 shadow-[0_10px_40px_-12px_rgba(127,29,29,0.18)] backdrop-blur";
 
 const STATUS_THEME = {
-  approved: "text-[#3F6B52] bg-[#EEF3EE] border-[#D7E4D9] shadow-sm",
-  pending: "text-[#9C7A22] bg-[#FBF3E3] border-[#EFE1BF] shadow-sm",
-  rejected: "text-[#A24A32] bg-[#FAF1EA] border-[#EAD9CC] shadow-sm",
-  default: "text-[#8A8478] bg-[#F1EFE8] border-[#E7E1D3]",
+  approved: { chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "bg-emerald-500", Icon: CheckCircle2 },
+  pending: { chip: "bg-amber-50 text-amber-700 ring-amber-200", bar: "bg-amber-400", Icon: Clock3 },
+  rejected: { chip: "bg-red-50 text-red-700 ring-red-200", bar: "bg-red-500", Icon: XCircle },
+  default: { chip: "bg-gray-100 text-gray-500 ring-gray-200", bar: "bg-gray-300", Icon: Info },
 };
+const themeFor = (status) => STATUS_THEME[status?.toLowerCase()] || STATUS_THEME.default;
+
+const TYPE_TONES = [
+  "bg-violet-50 text-violet-700 ring-violet-100",
+  "bg-sky-50 text-sky-700 ring-sky-100",
+  "bg-rose-50 text-rose-700 ring-rose-100",
+  "bg-teal-50 text-teal-700 ring-teal-100",
+  "bg-orange-50 text-orange-700 ring-orange-100",
+];
+const typeTone = (t = "") => TYPE_TONES[[...String(t)].reduce((a, c) => a + c.charCodeAt(0), 0) % TYPE_TONES.length];
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -23,6 +36,7 @@ const formatDate = (value) => {
     day: "numeric", month: "short", year: "numeric",
   });
 };
+const shortDate = (value) => (value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—");
 
 /* ===== UPDATED NET DAYS CALCULATOR HELPER ===== */
 const toLocalYMD = (dateInput) => {
@@ -52,6 +66,15 @@ const calculateNetDays = (startDate, endDate, holidays) => {
   return count;
 };
 
+/* calendar span (UI only, to show "x of y days counted") */
+const calendarDays = (s, e) => {
+  if (!s || !e) return 0;
+  const a = new Date(s), b = new Date(e);
+  const A = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const B = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((B - A) / 86400000) + 1;
+};
+
 /* ===== MONTH HELPERS ===== */
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const endOfMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -68,85 +91,75 @@ const leaveOverlapsMonth = (leave, monthStart, monthEnd) => {
   return s <= monthEnd && e >= monthStart;
 };
 
-/* Scoped scrollbar styling for the table viewport */
-const ScrollbarStyle = () => (
-  <style>{`
-    .leave-table-scroll::-webkit-scrollbar {
-      width: 10px;
-    }
-    .leave-table-scroll::-webkit-scrollbar-track {
-      background: #FBFAF6;
-      border-radius: 999px;
-    }
-    .leave-table-scroll::-webkit-scrollbar-thumb {
-      background-color: ${GOLD};
-      background-image: linear-gradient(180deg, ${GOLD}, ${RUST});
-      background-clip: padding-box;
-      border: 2.5px solid #FBFAF6;
-      border-radius: 999px;
-    }
-    .leave-table-scroll::-webkit-scrollbar-thumb:hover {
-      border-color: #F5EFE0;
-    }
-    .leave-table-scroll {
-      scrollbar-width: thin;
-      scrollbar-color: ${GOLD} #FBFAF6;
-    }
-  `}</style>
-);
+const AVATAR_BG = ["from-red-500 to-rose-400", "from-violet-500 to-fuchsia-400", "from-sky-500 to-cyan-400", "from-amber-500 to-orange-400", "from-emerald-500 to-teal-400"];
+const colorFor = (s = "") => AVATAR_BG[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_BG.length];
+const initials = (name = "") => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+const pageList = (totalPages, current) => {
+  const t = totalPages || 1;
+  if (t <= 7) return Array.from({ length: t }, (_, i) => i + 1);
+  const arr = [...new Set([1, t, current - 1, current, current + 1])].filter((p) => p >= 1 && p <= t).sort((a, b) => a - b);
+  const out = [];
+  arr.forEach((p, i) => { if (i && p - arr[i - 1] > 1) out.push("…" + i); out.push(p); });
+  return out;
+};
+
+const StatusChip = ({ status }) => {
+  const t = themeFor(status);
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${t.chip}`}>
+      <t.Icon size={12} /> {status || "—"}
+    </span>
+  );
+};
 
 /* ===== MOBILE CARD ===== */
 const MobileLeaveCard = ({ leave, index, handleView }) => {
-  const statusKey = leave.status?.toLowerCase() || "default";
-  const style = STATUS_THEME[statusKey] || STATUS_THEME.default;
-
+  const t = themeFor(leave.status);
+  const cal = calendarDays(leave.startDate, leave.endDate);
   return (
-    <div className="bg-white rounded-[1.5rem] shadow-sm border border-[#E7E1D3] p-6 transition-all active:scale-[0.98]">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-           <p className="text-[9px] font-black uppercase tracking-widest text-[#B8912E] mb-1">
-             LOG #{index + 1}
-           </p>
-           <h4 className="font-black text-[#1C1A17] uppercase tracking-tighter text-xl">
-             {leave.leaveType}
-           </h4>
-           <p className="text-[10px] font-bold text-[#8A8478] uppercase tracking-widest mt-1">
-             {leave.name} ({leave.employeeId})
-           </p>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index % 8, 8) * 0.04 }}
+      className="relative overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+      <span className={`absolute inset-y-0 left-0 w-1.5 ${t.bar}`} />
+      <div className="flex items-start justify-between gap-3 pl-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${colorFor(leave.name)} text-xs font-bold text-white shadow-md`}>
+            {initials(leave.name)}
+          </div>
+          <div className="min-w-0">
+            <h4 className="truncate font-bold text-gray-900">{leave.name}</h4>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-500"><Hash size={9} />{leave.employeeId}</span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} />{leave.department}</span>
+            </div>
+          </div>
         </div>
-        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${style}`}>
-          {leave.status}
-        </span>
+        <StatusChip status={leave.status} />
       </div>
 
-      <div className="bg-[#FBFAF6] rounded-2xl p-4 mb-4 border border-[#E7E1D3]">
-        <div className="flex items-center gap-2 text-[#8A8478] text-[10px] font-bold uppercase tracking-tight">
-          <Calendar size={14} className="text-[#B8912E]" />
-          {formatDate(leave.startDate)} — {formatDate(leave.endDate)}
-        </div>
-      </div>
-
-      <div className="flex justify-between items-end pt-4 border-t border-[#F1EFE8]">
-        <div className="max-w-[60%]">
-          <p className="text-[11px] font-medium text-[#8A8478] truncate">{leave.department || "No department"}</p>
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gray-50 p-3 pl-4 ring-1 ring-gray-100">
+        <div className="min-w-0">
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${typeTone(leave.leaveType)}`}>{leave.leaveType}</span>
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+            {shortDate(leave.startDate)} <ArrowRight size={11} className="text-gray-300" /> {shortDate(leave.endDate)}
+          </p>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-black text-[#1C1A17] leading-none">{leave.days}</p>
-          <p className="text-[8px] font-black uppercase text-[#8A8478] tracking-widest mt-1">Days</p>
+          <p className="text-2xl font-extrabold leading-none text-gray-900 tabular-nums">{leave.days}</p>
+          <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{leave.days === 1 ? "day" : "days"}{cal > leave.days ? ` of ${cal}` : ""}</p>
         </div>
       </div>
 
       <button
         onClick={() => handleView(leave._id)}
-        className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1C1A17] text-[#F6F3EC] text-[10px] font-bold uppercase tracking-widest hover:bg-[#B8912E] hover:text-[#1C1A17] transition-all duration-300 active:scale-95 cursor-pointer"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 py-2.5 text-sm font-bold text-white shadow-md shadow-red-600/25 transition active:scale-95"
       >
-        <Eye size={14} /> Open Dossier
+        <Eye size={15} /> View request
       </button>
-    </div>
+    </motion.div>
   );
 };
 
-const PAGE_SIZE_OPTIONS = [5, 10, 15, 20];
+const PAGE_SIZE_OPTIONS = [5, 8, 10, 15, 20];
 
 const AdminLeaveTable = () => {
   const [leaves, setLeaves] = useState([]);
@@ -160,16 +173,20 @@ const AdminLeaveTable = () => {
   const [itemsPerPage, setItemsPerPage] = useState(8);
 
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()));
+  const [dir, setDir] = useState(0); // UI-only: month slide direction
 
   const handleView = (id) => navigate(`/admin-dashboard/leaves/${id}`);
 
   const goToPrevMonth = () => {
+    setDir(-1);
     setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
   const goToNextMonth = () => {
+    setDir(1);
     setSelectedMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
   const goToCurrentMonth = () => {
+    setDir(selectedMonth < startOfMonth(new Date()) ? 1 : -1);
     setSelectedMonth(startOfMonth(new Date()));
   };
 
@@ -222,7 +239,10 @@ const AdminLeaveTable = () => {
   useEffect(() => {
     let result = leaves.filter((l) => leaveOverlapsMonth(l, monthStart, monthEnd));
     if (statusFilter !== "All") result = result.filter((l) => l.status === statusFilter);
-    if (search.trim()) result = result.filter((l) => l.employeeId.toLowerCase().includes(search.toLowerCase()));
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((l) => l.employeeId.toLowerCase().includes(q) || l.name.toLowerCase().includes(q));
+    }
     setFilteredLeaves(result);
     setCurrentPage(1);
   }, [search, statusFilter, leaves, monthStart, monthEnd]);
@@ -253,343 +273,293 @@ const AdminLeaveTable = () => {
     [monthLeaves]
   );
 
+  /* UI-only extras */
+  const approvedDays = monthLeaves.filter((l) => l.status === "Approved").reduce((s, l) => s + (l.days || 0), 0);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const hasFilters = !!search.trim() || statusFilter !== "All";
+  const clearFilters = () => { setSearch(""); setStatusFilter("All"); };
+
+  const STATS = [
+    ["All", "Total", monthLeaves.length, ListFilter, "bg-white/15 ring-white/20"],
+    ["Pending", "Pending", pendingCount, Clock3, "bg-amber-300/25 ring-amber-200/40"],
+    ["Approved", "Approved", approvedCount, CheckCircle2, "bg-emerald-300/25 ring-emerald-200/40"],
+    ["Rejected", "Rejected", rejectedCount, XCircle, "bg-red-900/25 ring-red-200/30"],
+  ];
+
   return (
-    <div className="min-h-screen bg-[#F6F3EC] pb-12">
-      <ScrollbarStyle />
-      <div className="max-w-[1400px] mx-auto p-4 sm:p-8 space-y-6">
+    <div className={`min-h-screen ${PAGE_BG} pb-16 text-gray-900`}>
+      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
 
         {/* HEADER */}
-        <header className="flex items-center gap-6 pt-2">
-          <div
-            className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-[#F6F3EC] shadow-xl shadow-black/10 ring-1 ring-[#B8912E]/20 shrink-0"
-            style={{ background: `linear-gradient(155deg, ${INK} 0%, ${GARNET} 100%)` }}
-          >
-            <ClipboardList size={30} strokeWidth={2} />
+        <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+              <ClipboardList size={26} />
+              {pendingCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-amber-950 ring-2 ring-white">{pendingCount}</span>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">People</p>
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Leave <span className="bg-gradient-to-r from-red-600 to-rose-500 bg-clip-text text-transparent">Requests</span>
+              </h1>
+              <p className="flex items-center gap-1.5 text-sm text-gray-500">
+                <Info size={13} /> Days counted exclude Saturdays, Sundays and holidays
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-[#1C1A17] uppercase tracking-tighter sm:text-4xl leading-none">
-              Leave<span className="text-[#B8912E]"> Control</span>
-            </h1>
-            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#8A8478] mt-3">
-              Deduction excludes Sat, Sun &amp; Holidays
-            </p>
-          </div>
-        </header>
+          <button type="button" onClick={fetchLeavesAndHolidays} disabled={loading}
+            className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-60 sm:self-auto">
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
+          </button>
+        </motion.header>
 
         {/* MONTH COMMAND BAR */}
-        <div
-          className="relative overflow-hidden rounded-[2rem] p-6 shadow-[0_24px_48px_-20px_rgba(28,26,23,0.45)] sm:rounded-[2.5rem] sm:p-8"
-          style={{ background: `linear-gradient(135deg, ${INK} 0%, ${GARNET} 78%)` }}
-        >
-          {/* decorative glow accents */}
-          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-30 blur-3xl" style={{ backgroundColor: GOLD }} />
-          <div className="pointer-events-none absolute -bottom-28 -left-16 h-56 w-56 rounded-full opacity-20 blur-3xl" style={{ backgroundColor: GOLD }} />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-[0_20px_50px_-15px_rgba(220,38,38,0.55)] sm:p-6">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/15 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-orange-300/25 blur-3xl" />
 
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-
-            {/* LEFT — month identity + navigation */}
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[#1C1A17] shadow-lg"
-                style={{ background: `linear-gradient(155deg, ${GOLD} 0%, #E4C878 100%)` }}
-              >
-                <CalendarClock size={20} strokeWidth={2.25} />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            {/* month identity + navigation */}
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+                <CalendarClock size={22} />
               </div>
-
-              <div>
-                <p className="text-[7px] font-black uppercase tracking-[0.4em]" style={{ color: "#E4C878" }}>
-                  Viewing Period
-                </p>
-                <p className="mt-1.5 text-xl font-black uppercase leading-none tracking-tight text-white sm:text-2xl">
-                  {monthLabel(selectedMonth)}
-                </p>
-                <p className="mt-2 text-[8px] font-bold uppercase tracking-widest text-white/50">
-                  {formatDate(monthStart)} — {formatDate(monthEnd)}
-                </p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">Viewing period</p>
+                <div className="relative h-8 overflow-hidden">
+                  <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+                    <motion.p key={monthLabel(selectedMonth)} custom={dir}
+                      initial={{ y: dir * 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -dir * 24, opacity: 0 }}
+                      transition={{ duration: 0.22 }}
+                      className="text-2xl font-extrabold leading-8 tracking-tight">
+                      {monthLabel(selectedMonth)}
+                    </motion.p>
+                  </AnimatePresence>
+                </div>
+                <p className="text-xs text-white/70">{formatDate(monthStart)} — {formatDate(monthEnd)}</p>
               </div>
-
-              {/* nav controls */}
-              <div className="flex items-center gap-2 sm:ml-2">
-                <button
-                  onClick={goToPrevMonth}
-                  aria-label="Previous month"
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all duration-200 hover:border-white/30 hover:bg-white/20 active:scale-90"
-                >
-                  <ChevronLeft size={15} strokeWidth={2.5} />
+              <div className="ml-auto flex items-center gap-1.5 lg:ml-4">
+                <button onClick={goToPrevMonth} aria-label="Previous month"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20 transition hover:bg-white/25 active:scale-90">
+                  <ChevronLeft size={17} />
                 </button>
-
                 {!isCurrentMonth(selectedMonth) ? (
-                  <button
-                    onClick={goToCurrentMonth}
-                    className="flex h-8 items-center justify-center whitespace-nowrap rounded-xl px-4 text-[7px] font-black uppercase tracking-widest text-[#1C1A17] shadow-md transition-all duration-200 hover:-translate-y-0.5 active:scale-95 cursor-pointer"
-                    style={{ background: `linear-gradient(155deg, ${GOLD} 0%, #E4C878 100%)` }}
-                  >
-                    Jump to Today
+                  <button onClick={goToCurrentMonth}
+                    className="h-9 whitespace-nowrap rounded-xl bg-white px-3 text-xs font-bold text-red-600 shadow transition hover:-translate-y-0.5 active:scale-95">
+                    This month
                   </button>
                 ) : (
-                  <span className="flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/15 bg-white/10 px-4 text-[7px] font-black uppercase tracking-widest text-white/70">
+                  <span className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/15 px-3 text-xs font-semibold ring-1 ring-white/20">
                     <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: GOLD }} />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-70" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
                     </span>
                     Current
                   </span>
                 )}
-
-                <button
-                  onClick={goToNextMonth}
-                  aria-label="Next month"
-                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all duration-200 hover:border-white/30 hover:bg-white/20 active:scale-90"
-                >
-                  <ChevronRight size={15} strokeWidth={2.5} />
+                <button onClick={goToNextMonth} aria-label="Next month"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20 transition hover:bg-white/25 active:scale-90">
+                  <ChevronRight size={17} />
                 </button>
               </div>
             </div>
 
-            {/* RIGHT — quiet stat readout */}
-            <div className="grid grid-cols-2 gap-2.5 sm:flex sm:items-stretch sm:gap-3">
-              <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-1 backdrop-blur-sm">
-                <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/45">Total Logs</p>
-                <p className="text-xl font-black tracking-tight text-white">{monthLeaves.length}</p>
-              </div>
-              <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-1 backdrop-blur-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#F0C869" }} />
-                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/45">Pending</p>
-                </div>
-                <p className="text-xl font-black tracking-tight" style={{ color: "#F0C869" }}>{pendingCount}</p>
-              </div>
-              <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-1 backdrop-blur-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#7FC79A" }} />
-                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/45">Approved</p>
-                </div>
-                <p className="text-xl font-black tracking-tight" style={{ color: "#7FC79A" }}>{approvedCount}</p>
-              </div>
-              <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-1 backdrop-blur-sm">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "#E38268" }} />
-                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/45">Rejected</p>
-                </div>
-                <p className="text-xl font-black tracking-tight" style={{ color: "#E38268" }}>{rejectedCount}</p>
-              </div>
+            {/* stats — clickable filters */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[30rem]">
+              {STATS.map(([key, label, count, Icon, tone]) => {
+                const active = statusFilter === key;
+                return (
+                  <button key={key} type="button" onClick={() => setStatusFilter(key)}
+                    className={`relative rounded-2xl p-3 text-left ring-1 transition hover:-translate-y-0.5 ${active ? "bg-white text-red-600 ring-white shadow-lg" : `${tone} text-white`}`}>
+                    <p className={`flex items-center gap-1.5 text-[11px] font-semibold ${active ? "text-red-500" : "text-white/80"}`}><Icon size={12} /> {label}</p>
+                    <p className="mt-0.5 text-2xl font-extrabold tabular-nums">{count}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
+          {approvedDays > 0 && (
+            <p className="relative mt-4 text-xs text-white/80">
+              <b className="text-white">{approvedDays}</b> working day{approvedDays > 1 ? "s" : ""} of approved leave this month
+            </p>
+          )}
+        </motion.div>
 
-        {/* CONTROLS */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-[#E7E1D3] p-5">
-          <div className="flex flex-col lg:flex-row gap-3">
-            <div className="relative flex-1 group">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[#C9C2AE] group-focus-within:text-[#B8912E] transition-colors" size={15} />
+        {/* TABLE CARD */}
+        <div className={`${CARD} overflow-hidden`}>
+          {/* Controls */}
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:p-5 lg:flex-row lg:items-center">
+            <div className="group relative flex flex-1 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
+              <Search size={17} className="text-gray-400 transition group-focus-within:text-red-500" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="SEARCH EMPLOYEE ID..."
-                className="w-full bg-[#F6F3EC] border-2 border-transparent rounded-[1.5rem] pl-14 pr-6 py-4 text-[11px] font-black uppercase tracking-widest outline-none focus:border-[#B8912E]/30 focus:bg-white transition-all text-[#1C1A17] placeholder:text-[#C9C2AE]"
+                placeholder="Search by employee ID or name…"
+                className="w-full bg-transparent py-3 pl-3 text-sm font-medium text-gray-900 outline-none placeholder:text-gray-400"
               />
+              {search && (
+                <button onClick={() => setSearch("")} aria-label="Clear search" className="rounded-full p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"><X size={14} /></button>
+              )}
             </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-2 px-1">
-              {["All", "Pending", "Approved", "Rejected"].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setStatusFilter(item)}
-                  style={statusFilter === item ? { background: `linear-gradient(155deg, ${INK} 0%, ${GARNET} 100%)` } : undefined}
-                  className={`px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-                    statusFilter === item
-                      ? "text-[#F6F3EC] border border-transparent shadow-lg"
-                      : "bg-white text-[#8A8478] border border-[#E7E1D3] hover:border-[#B8912E]/40 hover:text-[#B8912E] cursor-pointer"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
+            <div className="flex gap-1 rounded-2xl bg-gray-100/80 p-1">
+              {["All", "Pending", "Approved", "Rejected"].map((item) => {
+                const active = statusFilter === item;
+                return (
+                  <button key={item} onClick={() => setStatusFilter(item)}
+                    className={`relative flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4 ${active ? "text-red-600" : "text-gray-500 hover:text-gray-800"}`}>
+                    {active && <motion.span layoutId="leave-filter" className="absolute inset-0 rounded-xl bg-white shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                    <span className="relative">{item}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
 
-        {/* CONTENT */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-[#E7E1D3] overflow-hidden mt-4">
+          {hasFilters && !loading && (
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5 text-xs sm:px-6">
+              <span className="text-gray-500"><b className="text-gray-900">{filteredLeaves.length}</b> of {monthLeaves.length} requests in {monthLabel(selectedMonth)}</span>
+              <button onClick={clearFilters} className="font-semibold text-red-600 hover:underline">Clear filters</button>
+            </div>
+          )}
+
           {loading ? (
-            <div className="p-24 text-center">
-              <div className="w-12 h-12 border-4 border-[#EFE9D8] border-t-[#B8912E] rounded-full animate-spin mx-auto mb-5"></div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#8A8478]">Syncing Records...</p>
+            <div className="space-y-3 p-5">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex animate-pulse items-center gap-4 rounded-2xl p-3">
+                  <div className="h-10 w-10 rounded-2xl bg-gray-200" />
+                  <div className="flex-1 space-y-2"><div className="h-3 w-40 rounded bg-gray-200" /><div className="h-2.5 w-24 rounded bg-gray-100" /></div>
+                  <div className="hidden h-6 w-40 rounded-full bg-gray-100 sm:block" />
+                  <div className="h-8 w-20 rounded-xl bg-gray-100" />
+                </div>
+              ))}
             </div>
           ) : (
             <>
               {/* MOBILE */}
-              <div className="lg:hidden p-4 space-y-4">
+              <div className="space-y-3 p-4 lg:hidden">
                 {currentItems.length > 0 ? (
-                    currentItems.map((leave, i) => (
-                        <MobileLeaveCard key={leave._id} leave={leave} index={(currentPage - 1) * itemsPerPage + i} handleView={handleView} />
-                    ))
+                  currentItems.map((leave, i) => (
+                    <MobileLeaveCard key={leave._id} leave={leave} index={startIndex + i} handleView={handleView} />
+                  ))
                 ) : (
-                    <p className="text-center py-10 text-[#8A8478] font-bold uppercase text-[10px]">No records match criteria</p>
+                  <EmptyState month={monthLabel(selectedMonth)} filtered={hasFilters} onClear={clearFilters} />
                 )}
               </div>
 
-              {/* DESKTOP TABLE — scrollable viewport with sticky header */}
-              <div className="hidden lg:block px-8 pt-6 pb-2">
-                <div
-                  className="relative overflow-hidden rounded-[1.75rem] border shadow-[inset_0_1px_2px_rgba(28,26,23,0.03)]"
-                  style={{ borderColor: HAIRLINE, backgroundColor: "#FBFAF6" }}
-                >
-                  <div className="leave-table-scroll max-h-[30rem] overflow-y-auto overflow-x-auto px-3 pb-3 pt-1">
-                    <table className="w-full border-separate" style={{ borderSpacing: "0 0.875rem" }}>
-                      <thead className="sticky top-0 z-10">
-                        <tr className="text-left text-[10.5px] font-black text-[#8A8478] uppercase tracking-[0.28em]">
-                          <th className="px-5 py-4 pt-5 font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Ref</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Personnel</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Duration</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 text-center font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Net Days</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Department</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 text-right font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Status</span>
-                          </th>
-                          <th className="px-5 py-4 pt-5 text-right font-black" style={{ backgroundColor: "#FBFAF6" }}>
-                            <span className="border-b-2 pb-1" style={{ borderColor: GOLD }}>Dossier</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentItems.map((leave, i) => {
-                          const statusKey = leave.status?.toLowerCase() || "default";
-                          return (
-                            <tr
-                              key={leave._id}
-                              className="group relative animate-in fade-in border transition-all duration-300 hover:-translate-y-[3px] hover:border-[#B8912E]/40 hover:shadow-[0_20px_36px_-18px_rgba(28,26,23,0.2)]"
-                              style={{ backgroundColor: "#fff", borderColor: HAIRLINE, animationDelay: `${i * 40}ms`, animationFillMode: "backwards" }}
+              {/* DESKTOP TABLE */}
+              <div className="hidden lg:block">
+                <table className="w-full table-auto border-collapse text-left">
+                  <thead>
+                    <tr className="bg-gray-50/70 text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="w-14 py-3 pl-6 pr-2 font-bold">#</th>
+                      <th className="px-3 py-3 font-bold">Employee</th>
+                      <th className="px-3 py-3 font-bold">Type</th>
+                      <th className="px-3 py-3 font-bold">Dates</th>
+                      <th className="px-3 py-3 text-center font-bold">Days</th>
+                      <th className="px-3 py-3 font-bold">Status</th>
+                      <th className="w-px whitespace-nowrap py-3 pl-3 pr-6 text-right font-bold">View</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {currentItems.map((leave, i) => {
+                      const t = themeFor(leave.status);
+                      const cal = calendarDays(leave.startDate, leave.endDate);
+                      return (
+                        <motion.tr key={leave._id}
+                          initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * 0.03 }}
+                          onClick={() => handleView(leave._id)}
+                          className="group cursor-pointer transition-colors hover:bg-red-50/40">
+                          <td className="relative py-3.5 pl-6 pr-2 text-xs font-semibold tabular-nums text-gray-400">
+                            <span className={`absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full ${t.bar}`} />
+                            {String(startIndex + i + 1).padStart(2, "0")}
+                          </td>
+                          <td className="max-w-0 px-3 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${colorFor(leave.name)} text-xs font-bold text-white shadow-md`}>
+                                {initials(leave.name)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-gray-900 transition group-hover:text-red-700">{leave.name}</p>
+                                <p className="flex items-center gap-2 truncate text-xs text-gray-400">
+                                  <span className="inline-flex items-center gap-0.5 font-mono"><Hash size={10} />{leave.employeeId}</span>
+                                  <span className="inline-flex items-center gap-1 truncate"><Briefcase size={10} />{leave.department}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3.5">
+                            <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${typeTone(leave.leaveType)}`}>{leave.leaveType || "—"}</span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3.5">
+                            <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
+                              {shortDate(leave.startDate)} <ArrowRight size={12} className="text-gray-300" /> {shortDate(leave.endDate)}
+                            </p>
+                            <p className="text-[11px] text-gray-400">{new Date(leave.endDate).getFullYear()}</p>
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            <p className="text-xl font-extrabold tabular-nums text-gray-900">{leave.days}</p>
+                            {cal > leave.days && <p className="text-[10px] text-gray-400" title="Calendar days in range">of {cal}</p>}
+                          </td>
+                          <td className="px-3 py-3.5"><StatusChip status={leave.status} /></td>
+                          <td className="w-px whitespace-nowrap py-3.5 pl-3 pr-6 text-right">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleView(leave._id); }}
+                              aria-label={`View leave for ${leave.name}`}
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition ${
+                                leave.status === "Pending"
+                                  ? "bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-md shadow-red-600/25 hover:brightness-110"
+                                  : "bg-white text-gray-600 ring-1 ring-gray-200 hover:text-red-600 hover:ring-red-200"
+                              }`}
                             >
-                              <td className="relative rounded-l-[1.5rem] px-5 py-6 text-[11px] font-black text-[#D6D0BF] transition-colors duration-300 group-hover:text-[#B8912E]">
-                                {/* left accent bar — reveals on hover */}
-                                <span
-                                  className="absolute left-0 top-1/2 h-2/3 w-[3px] -translate-y-1/2 rounded-r-full opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                                  style={{ background: `linear-gradient(180deg, ${GOLD}, ${RUST})` }}
-                                />
-                                #{(currentPage - 1) * itemsPerPage + i + 1}
-                              </td>
-                              <td className="px-5 py-6">
-                                <div className="flex flex-col">
-                                  <span className="font-black uppercase text-[#1C1A17] group-hover:text-[#B8912E] transition-colors text-base leading-tight">{leave.name}</span>
-                                  <span className="text-[10px] font-bold text-[#8A8478] uppercase tracking-tight">ID: {leave.employeeId}</span>
-                                </div>
-                              </td>
-                              <td className="px-5 py-6">
-                                <span className="bg-white px-4 py-2 rounded-xl text-[10px] font-black text-[#8A8478] border border-[#E7E1D3] inline-block">
-                                  {formatDate(leave.startDate)} <span className="mx-2 text-[#D9C79A]">→</span> {formatDate(leave.endDate)}
-                                </span>
-                              </td>
-                              <td className="px-5 py-6 text-center">
-                                <span className="text-2xl font-black text-[#1C1A17]">{leave.days}</span>
-                              </td>
-                              <td className="px-5 py-6 font-black uppercase text-[10px] text-[#8A8478] tracking-wider">
-                                {leave.department}
-                              </td>
-                              <td className="px-5 py-6 text-right">
-                                <span className={`px-6 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 inline-block ${STATUS_THEME[statusKey] || STATUS_THEME.default}`}>
-                                  {leave.status}
-                                </span>
-                              </td>
-                              <td className="rounded-r-[1.5rem] px-5 py-6 text-right">
-                                <button
-                                  onClick={() => handleView(leave._id)}
-                                  className="group/btn p-2.5 rounded-full bg-white border border-[#E7E1D3] text-[#8A8478] hover:text-[#B8912E] hover:border-[#B8912E]/40 transition-all duration-300 active:scale-90 cursor-pointer"
-                                >
-                                  <Eye size={16} strokeWidth={3} />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-
-                    {currentItems.length === 0 && (
-                      <p className="text-center py-10 text-[#8A8478] font-bold uppercase text-[10px]">No records match criteria</p>
-                    )}
-                  </div>
-
-                  {/* bottom fade — hints there's more to scroll */}
-                  {currentItems.length > 4 && (
-                    <div
-                      className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b-[1.75rem]"
-                      style={{ background: "linear-gradient(180deg, transparent, #FBFAF6)" }}
-                    />
-                  )}
-                </div>
+                              <Eye size={14} /> {leave.status === "Pending" ? "Review" : "View"}
+                            </button>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {currentItems.length === 0 && <EmptyState month={monthLabel(selectedMonth)} filtered={hasFilters} onClear={clearFilters} />}
               </div>
 
               {/* PAGINATION */}
               {filteredLeaves.length > 0 && (
-                <div className="flex flex-col items-center gap-6 p-6 sm:p-10 bg-[#FBFAF6] border-t border-[#E7E1D3] sm:flex-row sm:justify-between">
-                  {/* Previous */}
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="order-2 flex h-11 w-full flex-1 items-center justify-center gap-3 rounded-[1.5rem] bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-[#8A8478] border border-[#E7E1D3] transition-all enabled:hover:text-[#B8912E] enabled:hover:border-[#B8912E]/40 enabled:active:scale-95 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed sm:order-1 sm:w-auto sm:flex-none"
-                  >
-                    <ChevronLeft size={16} strokeWidth={3} /> Prev
-                  </button>
-
-                  {/* Page Counter — middle */}
-                  <div className="order-1 px-8 py-3 bg-white rounded-full border border-[#E7E1D3] sm:order-2">
-                    <p className="text-[10px] sm:text-[11px] font-black text-[#8A8478] uppercase tracking-widest text-center">
-                      Page <span className="text-[#B8912E]">{currentPage}</span>
-                      <span className="mx-2 text-[#D6D0BF]">/</span> {totalPages || 1}
-                    </p>
-                  </div>
-
-                  {/* Right cluster — Next + per-page, grouped as one unit */}
-                  <div className="order-3 flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                      disabled={currentPage === totalPages || totalPages === 0}
-                      className="flex h-11 flex-1 items-center justify-center gap-3 rounded-[1.5rem] bg-white px-8 py-4 text-[10px] font-black uppercase tracking-widest text-[#8A8478] border border-[#E7E1D3] transition-all enabled:hover:text-[#B8912E] enabled:hover:border-[#B8912E]/40 enabled:active:scale-95 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed sm:flex-none"
-                    >
-                      Next <ChevronRight size={16} strokeWidth={3} />
+                <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-4 sm:flex-row sm:justify-between sm:px-6">
+                  <p className="text-xs text-gray-500">
+                    Showing <b className="text-gray-900">{startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredLeaves.length)}</b> of <b className="text-gray-900">{filteredLeaves.length}</b>
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1} aria-label="Previous page"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-gray-200 transition enabled:hover:text-red-600 enabled:hover:ring-red-200 disabled:opacity-40">
+                      <ChevronLeft size={16} />
                     </button>
-
-                    {/* divider */}
-                    <div className="hidden h-6 w-px sm:block" style={{ backgroundColor: HAIRLINE }} />
-
-                    {/* PAGE SIZE SELECTOR */}
-                    <div
-                      className="flex h-11 shrink-0 items-center gap-2.5 rounded-2xl border bg-white px-3"
-                      style={{ borderColor: HAIRLINE }}
-                    >
-                      <span className="whitespace-nowrap text-[9px] font-black uppercase tracking-widest text-[#C9C2AE]">
-                        Per page
-                      </span>
-                      <div className="relative">
-                        <select
-                          value={itemsPerPage}
-                          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                          className="cursor-pointer appearance-none rounded-lg border bg-white py-1.5 pl-3 pr-7 text-[12px] font-black text-[#1C1A17] outline-none transition-all hover:border-[#B8912E]/40 focus:border-[#B8912E]/60"
-                          style={{ borderColor: HAIRLINE }}
-                        >
-                          {PAGE_SIZE_OPTIONS.map((size) => (
-                            <option key={size} value={size}>
-                              {size}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown
-                          size={12}
-                          strokeWidth={2.5}
-                          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#8A8478]"
-                        />
-                      </div>
+                    {pageList(totalPages, currentPage).map((p) =>
+                      typeof p === "string" ? <span key={p} className="px-1 text-gray-400">…</span> : (
+                        <button key={p} onClick={() => setCurrentPage(p)}
+                          className={`relative h-9 min-w-9 rounded-xl px-2 text-sm font-semibold transition ${p === currentPage ? "text-white" : "text-gray-600 hover:bg-white hover:text-red-600"}`}>
+                          {p === currentPage && <motion.span layoutId="leave-page" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow shadow-red-600/30" />}
+                          <span className="relative">{p}</span>
+                        </button>
+                      )
+                    )}
+                    <button onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages || totalPages === 0} aria-label="Next page"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-gray-200 transition enabled:hover:text-red-600 enabled:hover:ring-red-200 disabled:opacity-40">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    Per page
+                    <div className="flex rounded-xl bg-white p-0.5 ring-1 ring-gray-200">
+                      {PAGE_SIZE_OPTIONS.map((size) => (
+                        <button key={size} onClick={() => handlePageSizeChange(size)}
+                          className={`rounded-lg px-2.5 py-1 font-semibold transition ${itemsPerPage === size ? "bg-red-50 text-red-600" : "text-gray-500 hover:text-gray-800"}`}>
+                          {size}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -601,5 +571,16 @@ const AdminLeaveTable = () => {
     </div>
   );
 };
+
+const EmptyState = ({ month, filtered, onClear }) => (
+  <div className="flex flex-col items-center px-6 py-14 text-center">
+    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-50 text-gray-300 ring-1 ring-gray-100"><Inbox size={22} /></div>
+    <p className="text-sm font-bold text-gray-700">{filtered ? "No requests match these filters" : `No leave requests in ${month}`}</p>
+    <p className="mt-1 text-xs text-gray-400">{filtered ? "Try a different status or search." : "Use the arrows above to check another month."}</p>
+    {filtered && (
+      <button onClick={onClear} className="mt-4 rounded-xl bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-100">Clear filters</button>
+    )}
+  </div>
+);
 
 export default AdminLeaveTable;
