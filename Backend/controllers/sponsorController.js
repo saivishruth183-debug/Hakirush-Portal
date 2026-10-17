@@ -1,6 +1,6 @@
 import Sponsor from "../models/Sponsor.js";
 import uploadToImageKit from "../utils/uploadToImageKit.js";
-import { asyncHandler, notFound, ApiError } from "../middleware/errorHandler.js";
+import { asyncHandler, notFound, ApiError, conflict } from "../middleware/errorHandler.js";
 import { requireObjectId, trimmedString, toFiniteNumber, requireEnum } from "../utils/validate.js";
 
 const COLLABORATIONS = ["Title Sponsor", "Associate Sponsor", "Event Sponsor", "Media Partner"];
@@ -17,6 +17,7 @@ const uploadLogo = async (file) => {
 // Allowlisted fields; `partial` for updates (only provided keys).
 const parseSponsor = (b = {}, { partial = false } = {}) => {
   const out = {};
+  if (!partial || b.sponsorId !== undefined) out.sponsorId = trimmedString(b.sponsorId, "Sponsor ID", { max: 100 });
   if (!partial || b.name !== undefined) out.name = trimmedString(b.name, "name", { max: 200 });
   if (!partial || b.collaboration !== undefined) out.collaboration = requireEnum(b.collaboration, COLLABORATIONS, "collaboration");
   if (b.eventsSponsored !== undefined && b.eventsSponsored !== "") {
@@ -35,7 +36,15 @@ const parseSponsor = (b = {}, { partial = false } = {}) => {
 export const addSponsor = asyncHandler(async (req, res) => {
   const data = parseSponsor(req.body);
   const logo = await uploadLogo(req.file);
-  const sponsor = await Sponsor.create({ ...data, logo: logo || "" });
+  let sponsor;
+  try {
+    sponsor = await Sponsor.create({ ...data, logo: logo || "" });
+  } catch (err) {
+    if (err?.code === 11000 && err.keyPattern?.sponsorId) {
+      throw conflict("Sponsor ID already exists", "DUPLICATE_SPONSOR_ID");
+    }
+    throw err;
+  }
   res.status(201).json({ success: true, sponsor });
 });
 
@@ -59,7 +68,15 @@ export const updateSponsor = asyncHandler(async (req, res) => {
   const data = parseSponsor(req.body, { partial: true });
   const logo = await uploadLogo(req.file);
   if (logo) data.logo = logo;
-  const updated = await Sponsor.findByIdAndUpdate(req.params.id, { $set: data }, { new: true, runValidators: true });
+  let updated;
+  try {
+    updated = await Sponsor.findByIdAndUpdate(req.params.id, { $set: data }, { new: true, runValidators: true });
+  } catch (err) {
+    if (err?.code === 11000 && err.keyPattern?.sponsorId) {
+      throw conflict("Sponsor ID already exists", "DUPLICATE_SPONSOR_ID");
+    }
+    throw err;
+  }
   if (!updated) throw notFound("Sponsor not found");
   res.json({ success: true, message: "Sponsor updated", sponsor: updated });
 });
