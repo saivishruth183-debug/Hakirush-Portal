@@ -199,7 +199,7 @@ const SponsorView = () => {
               <Row icon={Trophy} label="Events sponsored" value={String(events)} />
               <Row icon={Globe} label="Market reach" value={sponsor.reach} />
               <Row icon={Calendar} label="Added to directory" value={createdLong} />
-              <Row icon={Fingerprint} label="Sponsor ID" value={sponsor._id} copy mono />
+              <Row icon={Fingerprint} label="Sponsor ID" value={sponsor.sponsorId || sponsor._id} copy mono />
             </dl>
           </motion.section>
 
