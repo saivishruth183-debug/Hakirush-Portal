@@ -57,6 +57,12 @@ export const installFakeImageKit = async () => {
       const filePath = `/${params.folder}/${n}-${params.fileName}`;
       return { url: `${process.env.IMAGEKIT_URL_ENDPOINT}${filePath}`, fileId: `file_${n}`, filePath };
     },
+    getAuthenticationParameters: (...args) => real.getAuthenticationParameters(...args),
+    getFileDetails: async (fileId) => {
+      const file = log.files.find((item) => item.fileId === fileId);
+      if (!file) throw new Error("File not found");
+      return file;
+    },
     deleteFile: async (fileId) => {
       log.deletes.push(fileId);
       return {};
