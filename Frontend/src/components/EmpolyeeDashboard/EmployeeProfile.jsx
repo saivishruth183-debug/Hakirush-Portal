@@ -1,6 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { formatTotalExperience } from "../../utils/employeeExperience";
 import {
   Calendar, ChevronLeft, Fingerprint, Mail,
   Droplets, Briefcase, IdCard, CreditCard,
@@ -168,7 +169,15 @@ const EmployeeProfile = () => {
             <Field icon={<User size={14} strokeWidth={1.5} />} label="Gender" value={employee.gender} />
             <Field icon={<Heart size={14} strokeWidth={1.5} />} label="Marital Status" value={employee.maritalStatus} />
             <Field icon={<Droplets size={14} strokeWidth={1.5} />} label="Blood Group" value={employee.bloodGroup} />
-            <Field icon={<Briefcase size={14} strokeWidth={1.5} />} label="Experience" value={`${employee.experience} Years`} />
+            <Field
+              icon={<Briefcase size={14} strokeWidth={1.5} />}
+              label="Total Experience"
+              value={formatTotalExperience(employee.experience, employee.dateOfJoining, {
+                isActive: employee.isActive ?? employee.userId?.isActive,
+                inactiveSince: employee.inactiveSince,
+                inactiveDurationMs: employee.inactiveDurationMs,
+              })}
+            />
             <Field
               icon={<Calendar size={14} strokeWidth={1.5} />}
               label="Official Join Date"
