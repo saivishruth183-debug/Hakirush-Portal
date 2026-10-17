@@ -140,10 +140,15 @@ describe("deactivation", () => {
     assert.equal(ok.status, 200);
     assert.equal(await managerOf(fx.departments.it._id), String(fx.itDev2.employee._id));
     assert.equal((await User.findById(fx.itManager.user._id).lean()).isActive, false);
+    const inactiveEmployee = await Employee.findById(fx.itManager.employee._id).lean();
+    assert.ok(inactiveEmployee.inactiveSince instanceof Date);
 
     const back = await request(app).patch(`/api/employee/${fx.itManager.employee._id}/status`).set(asAdmin()).send({ isActive: true });
     assert.equal(back.status, 200);
     assert.equal((await User.findById(fx.itManager.user._id).lean()).isActive, true);
+    const reactivatedEmployee = await Employee.findById(fx.itManager.employee._id).lean();
+    assert.equal(reactivatedEmployee.inactiveSince, undefined);
+    assert.ok(reactivatedEmployee.inactiveDurationMs >= 0);
 
     assert.equal((await request(app).patch(`/api/employee/${fx.itDev1.employee._id}/status`).set(auth(fx.itDev1.user)).send({ isActive: false })).status, 403);
   });
