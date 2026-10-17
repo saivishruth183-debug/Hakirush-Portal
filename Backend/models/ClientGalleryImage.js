@@ -2,10 +2,12 @@ import mongoose from "mongoose";
 
 export const GALLERY_CAPTION_MAX = 200;
 
-// Images an admin uploads for a specific client (ImageKit folder "client-gallery").
+// Admin-uploaded images can be private to a client or shared with all clients.
 const clientGalleryImageSchema = new mongoose.Schema(
   {
-    clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true, index: true },
+    clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", default: null, index: true },
+    audience: { type: String, enum: ["client", "allClients"], default: "client", index: true },
+    galleryMonth: { type: String, match: /^\d{4}-(0[1-9]|1[0-2])$/, default: null, index: true },
     url: { type: String, required: true },
     fileId: { type: String, default: null },
     filePath: { type: String, default: null },
