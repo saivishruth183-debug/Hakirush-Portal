@@ -64,14 +64,21 @@ describe("sponsors", () => {
   test("admin only; validated", async () => {
     assert.equal((await request(app).get("/api/sponsors").set(auth(fx.itDev1.user))).status, 403);
     assert.equal((await request(app).post("/api/sponsors/add").set(auth(fx.itDev1.user)).send({ name: "x" })).status, 403);
-    const bad = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ name: "Acme", collaboration: "Best Friend", reach: "Global" });
+    const missingSponsorId = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ name: "Acme", collaboration: "Title Sponsor", reach: "Global" });
+    assert.equal(missingSponsorId.status, 400);
+    const bad = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ sponsorId: "SP-BAD", name: "Acme", collaboration: "Best Friend", reach: "Global" });
     assert.equal(bad.status, 400);
-    const ok = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ name: "Acme", collaboration: "Title Sponsor", reach: "Global", eventsSponsored: "4" });
+    const ok = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ sponsorId: "SP-001", name: "Acme", collaboration: "Title Sponsor", reach: "Global", eventsSponsored: "4" });
     assert.equal(ok.status, 201);
+    assert.equal(ok.body.sponsor.sponsorId, "SP-001");
     assert.equal(ok.body.sponsor.eventsSponsored, 4);
+    const duplicate = await request(app).post("/api/sponsors/add").set(asAdmin()).send({ sponsorId: "SP-001", name: "Other", collaboration: "Title Sponsor", reach: "Global" });
+    assert.equal(duplicate.status, 409);
+    assert.equal(duplicate.body.code, "DUPLICATE_SPONSOR_ID");
     const id = ok.body.sponsor._id;
-    const upd = await request(app).put(`/api/sponsors/${id}`).set(asAdmin()).send({ reach: "Local", createdAt: "1999-01-01" });
+    const upd = await request(app).put(`/api/sponsors/${id}`).set(asAdmin()).send({ sponsorId: "SP-002", reach: "Local", createdAt: "1999-01-01" });
     assert.equal(upd.status, 200);
+    assert.equal(upd.body.sponsor.sponsorId, "SP-002");
     assert.equal(upd.body.sponsor.reach, "Local");
     assert.notEqual(new Date(upd.body.sponsor.createdAt).getUTCFullYear(), 1999);
     assert.equal((await request(app).get(`/api/sponsors/${new mongoose.Types.ObjectId()}`).set(asAdmin())).status, 404);
