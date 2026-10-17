@@ -25,6 +25,7 @@ const ClientList = lazy(() => import("./components/client/ClinetList"));
 const ClientAdd = lazy(() => import("./components/client/ClientAdd"));
 const ClientEdit = lazy(() => import("./components/client/ClientEdit"));
 const ViewClient = lazy(() => import("./components/client/ClientView"));
+const ClientContentAdmin = lazy(() => import("./components/client/ClientContentAdmin"));
 const SponsorList = lazy(() => import("./components/sponsor/SponsorList"));
 const SponsorAdd = lazy(() => import("./components/sponsor/SponsorAdd"));
 const SponsorEdit = lazy(() => import("./components/sponsor/SponsorEdit"));
@@ -107,6 +108,8 @@ const App = () => {
 
             <Route path="clients" element={<ClientList />} />
             <Route path="add-client" element={<ClientAdd />} />
+            <Route path="clients/content" element={<ClientContentAdmin />} />
+            <Route path="clients/:id/content" element={<ClientContentAdmin />} />
             <Route path="clients/:id" element={<ViewClient />} />
             <Route path="clients/edit/:id" element={<ClientEdit />} />
 
