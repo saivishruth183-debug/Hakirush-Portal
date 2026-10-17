@@ -83,8 +83,8 @@ Modified
     loading/error/Retry states, submit + delete disabled while in flight, server errors shown. Fields kept: `name`,
     `jerseySize`. The original form had the jersey-size `<select>` duplicated (two selects bound to the same field, one
     mislabelled "Event Type"); the duplicate was removed.
-12. **Admin client detail** (`ClientView` → `ClientMediaAdmin`): gallery upload (multipart `image` + optional `caption`,
-    JPEG/PNG/WebP), list, delete (confirm); standings table editor (add/remove rows; teamName/played/won/lost/points;
+12. **Admin client detail** (`ClientView` → `ClientMediaAdmin`): client-only gallery upload (short-lived ImageKit upload credentials, direct upload up to 50 MB, then backend-verified `fileId` + optional `caption`,
+    JPEG/PNG/WebP/GIF), list, delete (confirm); shared month-tagged gallery management (visible to all clients for the previous calendar month); standings table editor (add/remove rows; teamName/played/won/lost/points;
     client-side checks mirror the server: required name, non-negative integers, unique names, won+lost ≤ played) →
     PUT `/client/:id/performance`; shows `updatedAt`.
 13. **Payslips**: ViewPayslip and the AddPayslip history no longer open `payslipFile`. View = GET `/payslip/:id/link` then open
