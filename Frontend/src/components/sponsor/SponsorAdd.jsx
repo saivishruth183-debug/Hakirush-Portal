@@ -139,6 +139,7 @@ const SponsorAdd = () => {
   };
 
   const errors = {
+    sponsorId: !formData.sponsorId?.trim() ? "Sponsor ID is required" : "",
     name: !formData.name?.trim() ? "Sponsor name is required" : "",
     collaboration: !formData.collaboration ? "Choose a collaboration type" : "",
     eventsSponsored: formData.eventsSponsored !== undefined && formData.eventsSponsored !== "" &&
@@ -149,7 +150,7 @@ const SponsorAdd = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
-    setTouched({ name: true, collaboration: true, eventsSponsored: true });
+    setTouched({ sponsorId: true, name: true, collaboration: true, eventsSponsored: true });
     const firstErr = Object.values(errors).find(Boolean);
     if (firstErr) {
       setError({ title: "Check the form", message: `${firstErr}.` });
@@ -188,6 +189,7 @@ const SponsorAdd = () => {
 
   /* progress */
   const checks = [
+    ["Sponsor ID", !errors.sponsorId],
     ["Name", !errors.name],
     ["Collaboration", !errors.collaboration],
     ["Logo", !!formData.logo],
@@ -327,6 +329,12 @@ const SponsorAdd = () => {
               <SectionTitle icon={<UserPlus size={15} />} title="Sponsor details" subtitle="Who they are and how they partner with you" />
 
               <div className="mt-5">
+                <Field label="Sponsor ID" icon={Hash} required error={showErr("sponsorId")}>
+                  <input name="sponsorId" value={formData.sponsorId || ""} onChange={handleChange} onBlur={touch} placeholder="e.g. SP-2026-001" autoComplete="off" maxLength={100} className={inputCls(showErr("sponsorId"))} />
+                </Field>
+              </div>
+
+              <div className="mt-4">
                 <Field label="Sponsor name" icon={Building2} required error={showErr("name")}>
                   <input name="name" value={formData.name || ""} onChange={handleChange} onBlur={touch} placeholder="e.g. Apex Sports Drinks" autoComplete="organization" className={inputCls(showErr("name"))} />
                 </Field>
