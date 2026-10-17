@@ -93,15 +93,18 @@ Rules: manager is resolved separately from member pagination and is never filter
 | GET | /client/me | client | Fixed | `{success, client:{_id, userId:{_id,name,email,profileImage}, dateOfJoining, companyLogo, budget, planType}}` |
 | GET/POST | /client/me/roster | client | Added | GET `{success, entries:[{_id,name,jerseySize,createdAt,updatedAt}]}`; POST `{name (1-80 chars), jerseySize: XS|S|M|L|XL|XXL}` (ClientRelationship.jsx fields) → 201 `{success, entry}`; max 200 entries per client (409 `CONFLICT`) |
 | DELETE | /client/me/roster/:entryId | client | Added | owner only (another client's entry → 404) |
-| GET | /client/me/gallery | client | Added | `{success, images:[{_id,url,caption,createdAt}]}` (empty until admin uploads) |
+| GET | /client/me/gallery | client | Added | `{success, images:[{_id,url,caption,createdAt}], sharedImages:[{_id,url,caption,createdAt}], galleryMonth}`; shared images are identical for all clients and limited to the previous calendar month |
 | GET | /client/me/performance | client | Added | `{success, standings:[{_id,teamName,played,won,lost,points}], updatedAt|null}` (empty until admin enters data) |
 | GET | /client/images, /client/performance | client, admin | Fixed | Legacy: client → own data (query `userId` ignored); admin → `?userId=` (required). `/client/images` → `{success, images:[url], items:[{_id,url,caption,createdAt}]}`; `/client/performance` → `{success, performance:[standings rows], updatedAt}` (no sample data: `[]` until entered) |
 | GET | /client | admin | Fixed | list `{success, clients:[{_id, userId:{_id,name,email,profileImage}, dateOfJoining, companyLogo, budget, planType, createdAt, updatedAt}]}`; clients/employees → 403 |
 | GET | /client/:id | admin, owner | Fixed | another client's id → 404 |
 | POST/PUT/DELETE | /client/add, /client/:id | admin | Fixed | multipart `companyLogo`; add validates `name, email, password (8-128), planType (Annual|Quarterly), budget ≥ 0, dateOfJoining`, logo required, duplicate email → 409; PUT accepts `budget, planType` (+ logo); delete also removes that client's roster/gallery/performance |
-| GET/POST | /client/:id/gallery | admin | Added | POST multipart `image`, optional `caption` |
+| GET | /client/:id/gallery/upload-auth | admin | Added | Short-lived ImageKit upload credentials for client-gallery uploads (max 50 MB) |
+| GET/POST | /client/:id/gallery | admin | Added | POST `{fileId, caption?}` after direct-to-ImageKit upload; backend verifies file type, folder and size before saving |
+| GET | /client/gallery/shared/upload-auth | admin | Added | Short-lived credentials to upload shared client images directly to ImageKit |
+| GET/POST/DELETE | /client/gallery/shared | admin | Added | GET by `?month=YYYY-MM`; POST `{fileId, month, caption?}` publishes images to all clients for that month |
 | DELETE | /client/:id/gallery/:imageId | admin | Added | |
-| GET/PUT | /client/:id/performance | admin | Added | PUT `{standings:[{teamName,played,won,lost,points}]}` replaces the table (validated non-negative integers) |
+| GET/PUT | /client/:id/performance | admin | Added | Persisted per-client standings; PUT `{standings:[{teamName,played,won,lost,points}]}` replaces the table (validated non-negative integers; `[]` clears it) |
 
 ## Attendance
 | Method | Path | Role | Status | Contract |
