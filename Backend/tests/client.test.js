@@ -121,26 +121,50 @@ test("roster: validated, persisted across requests, isolated per client, capped"
 });
 
 test("gallery: admin uploads per client; clients read only their own (ids and ?userId ignored)", async () => {
+  const uploadAuth = await request(app)
+    .get(`/api/client/${A().client._id}/gallery/upload-auth`)
+    .set(auth(fx.admin));
+  assert.equal(uploadAuth.status, 200);
+  assert.equal(uploadAuth.body.publicKey, "test_public");
+  assert.ok(uploadAuth.body.authenticationParameters.signature);
+  assert.equal(uploadAuth.body.folder, "client-gallery");
+
+  const uploadedFile = (fileId, overrides = {}) => ({
+    fileId,
+    filePath: `/client-gallery/${fileId}.png`,
+    url: `${process.env.IMAGEKIT_URL_ENDPOINT}/client-gallery/${fileId}.png`,
+    fileType: "image",
+    size: 50 * 1024 * 1024,
+    ...overrides,
+  });
+  ikLog.files.push(uploadedFile("gallery-image"));
   const up = await request(app)
     .post(`/api/client/${A().client._id}/gallery`)
     .set(auth(fx.admin))
-    .field("caption", "Opening ceremony")
-    .attach("image", PNG_BYTES, { filename: "photo.png", contentType: "image/png" });
+    .send({ fileId: "gallery-image", caption: "Opening ceremony" });
   assert.equal(up.status, 201);
   assert.equal(up.body.image.caption, "Opening ceremony");
-  assert.equal(ikLog.uploads.at(-1).folder, "client-gallery");
+  assert.equal(up.body.image.fileId, "gallery-image");
 
+  ikLog.files.push(uploadedFile("not-image", { fileType: "non-image" }));
   const notImage = await request(app)
     .post(`/api/client/${A().client._id}/gallery`)
     .set(auth(fx.admin))
-    .attach("image", pdfBytes(), { filename: "x.png", contentType: "image/png" });
+    .send({ fileId: "not-image" });
   assert.equal(notImage.status, 415);
 
   const clientUpload = await request(app)
     .post(`/api/client/${A().client._id}/gallery`)
     .set(auth(A().user))
-    .attach("image", PNG_BYTES, { filename: "photo.png", contentType: "image/png" });
+    .send({ fileId: "gallery-image" });
   assert.equal(clientUpload.status, 403);
+
+  ikLog.files.push(uploadedFile("too-large", { size: 50 * 1024 * 1024 + 1 }));
+  const oversized = await request(app)
+    .post(`/api/client/${A().client._id}/gallery`)
+    .set(auth(fx.admin))
+    .send({ fileId: "too-large" });
+  assert.equal(oversized.status, 413);
 
   const meA = await request(app).get("/api/client/me/gallery").set(auth(A().user));
   assert.equal(meA.body.images.length, 1);
@@ -160,6 +184,11 @@ test("gallery: admin uploads per client; clients read only their own (ids and ?u
   const adminNoUser = await request(app).get(`/api/client/images`).set(auth(fx.admin));
   assert.equal(adminNoUser.status, 400);
 
+  assert.equal(
+    (await request(app).get(`/api/client/${A().client._id}/gallery/upload-auth`).set(auth(A().user))).status,
+    403
+  );
+
   // B cannot use the admin gallery endpoints for A.
   assert.equal((await request(app).get(`/api/client/${A().client._id}/gallery`).set(auth(B().user))).status, 403);
   const wrongClientDelete = await request(app)
@@ -168,7 +197,62 @@ test("gallery: admin uploads per client; clients read only their own (ids and ?u
   assert.equal(wrongClientDelete.status, 404);
   const del = await request(app).delete(`/api/client/${A().client._id}/gallery/${up.body.image._id}`).set(auth(fx.admin));
   assert.equal(del.status, 200);
-  assert.ok(ikLog.deletes.length >= 1);
+  assert.ok(ikLog.deletes.includes("gallery-image"));
+});
+
+test("shared gallery: admins publish month-scoped images visible to every client", async () => {
+  const nowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: process.env.ORG_TIMEZONE || "Asia/Kolkata",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(new Date());
+  const previousMonth = new Date(Date.UTC(
+    Number(nowParts.find((part) => part.type === "year").value),
+    Number(nowParts.find((part) => part.type === "month").value) - 2,
+    1
+  ));
+  const month = `${previousMonth.getUTCFullYear()}-${String(previousMonth.getUTCMonth() + 1).padStart(2, "0")}`;
+  const image = {
+    fileId: "shared-last-month",
+    filePath: "/client-gallery/shared-last-month.png",
+    url: `${process.env.IMAGEKIT_URL_ENDPOINT}/client-gallery/shared-last-month.png`,
+    fileType: "image",
+    size: 50 * 1024 * 1024,
+  };
+  ikLog.files.push(image);
+
+  const credentials = await request(app)
+    .get("/api/client/gallery/shared/upload-auth")
+    .set(auth(fx.admin));
+  assert.equal(credentials.status, 200);
+  assert.equal(credentials.body.maxFileBytes, 50 * 1024 * 1024);
+  assert.equal((await request(app).get("/api/client/gallery/shared/upload-auth").set(auth(A().user))).status, 403);
+
+  const uploaded = await request(app)
+    .post("/api/client/gallery/shared")
+    .set(auth(fx.admin))
+    .send({ fileId: image.fileId, month, caption: "Tournament finals" });
+  assert.equal(uploaded.status, 201);
+  assert.equal(uploaded.body.image.audience, "allClients");
+  assert.equal(uploaded.body.image.galleryMonth, month);
+
+  for (const client of [A(), B()]) {
+    const gallery = await request(app).get("/api/client/me/gallery").set(auth(client.user));
+    assert.equal(gallery.status, 200);
+    assert.deepEqual(gallery.body.sharedImages.map((entry) => entry.fileId), [image.fileId]);
+    assert.equal(gallery.body.galleryMonth, month);
+  }
+
+  const adminGallery = await request(app)
+    .get(`/api/client/gallery/shared?month=${month}`)
+    .set(auth(fx.admin));
+  assert.equal(adminGallery.status, 200);
+  assert.equal(adminGallery.body.images.length, 1);
+  assert.equal((await request(app).get("/api/client/gallery/shared?month=invalid").set(auth(fx.admin))).status, 400);
+  assert.equal(
+    (await request(app).delete(`/api/client/gallery/shared/${uploaded.body.image._id}`).set(auth(fx.admin))).status,
+    200
+  );
 });
 
 test("performance: empty until entered (no sample data); admin PUT replaces; isolation", async () => {
