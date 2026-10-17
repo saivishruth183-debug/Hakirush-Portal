@@ -92,6 +92,8 @@ const ClientSportsPlan = () => {
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [performanceData, setPerformanceData] = useState([]);
   const [clientImages, setClientImages] = useState([]);
+  const [sharedImages, setSharedImages] = useState([]);
+  const [galleryMonth, setGalleryMonth] = useState("");
   const [zoomImage, setZoomImage] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [activeEmployee, setActiveEmployee] = useState(null);
@@ -103,22 +105,24 @@ const ClientSportsPlan = () => {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
         const [clientRes, annRes, perfRes, imagesRes, empRes] = await Promise.all([
-          axios.get(`${API}/api/client`, { headers }),
+          axios.get(`${API}/api/client/me`, { headers }),
           axios.get(`${API}/api/announcements/public`, { headers }),
-          axios.get(`${API}/api/client/performance?userId=${user._id}`, { headers }),
+          axios.get(`${API}/api/client/me/performance`, { headers }),
           axios
-            .get(`${API}/api/client/images?userId=${user._id}`, { headers })
-            .catch(() => ({ data: { images: [] } })),
+            .get(`${API}/api/client/me/gallery`, { headers })
+            .catch(() => ({ data: { images: [], sharedImages: [], galleryMonth: "" } })),
           // 👉 Change this endpoint if your employee API is different
           axios
             .get(`${API}/api/client/employees?userId=${user._id}`, { headers })
             .catch(() => ({ data: { employees: [] } })),
         ]);
-        const found = clientRes.data.clients.find((c) => c.userId?._id === user._id);
+        const found = clientRes.data.client;
         setClient(found || null);
         setAnnouncements(annRes.data.announcements || []);
-        setPerformanceData(perfRes.data.performance || []);
-        setClientImages(imagesRes.data.images || []);
+        setPerformanceData(perfRes.data.standings || []);
+        setClientImages((imagesRes.data.images || []).map((image) => image.url));
+        setSharedImages((imagesRes.data.sharedImages || []).map((image) => image.url));
+        setGalleryMonth(imagesRes.data.galleryMonth || "");
 
         // Accepts { employees: [...] }, a plain array, or employees stored on the client record
         const rawEmployees = Array.isArray(empRes.data)
@@ -169,14 +173,17 @@ const ClientSportsPlan = () => {
     };
   }, [performanceData]);
 
-  const lastMonthImage = performanceData?.[0]?.lastMonthImage || null;
   const galleries = useMemo(
-    () => [
-      { id: "client", label: `${client?.userId?.name || "Client"} Gallery`, short: "Our Gallery", images: clientImages, interval: 5000 },
-      { id: "last", label: "Last Month Tournament", short: "Last Month", images: [Cricket, lastMonthImage || Cricket, Cricket, Cricket], interval: 6000 },
-      { id: "march", label: "March Highlights", short: "March", images: [Cricket, Cricket, Cricket], interval: 6000 },
-    ],
-    [client, clientImages, lastMonthImage]
+    () => {
+      const monthLabel = galleryMonth
+        ? new Date(`${galleryMonth}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+        : "Last Month";
+      return [
+        { id: "shared", label: `${monthLabel} Highlights`, short: monthLabel, images: sharedImages, interval: 6000 },
+        { id: "client", label: "Client Gallery", short: "Our Gallery", images: clientImages, interval: 5000 },
+      ];
+    },
+    [galleryMonth, sharedImages, clientImages]
   );
 
   if (loading) return <LoadingScreen />;
