@@ -43,7 +43,19 @@ export const createApp = () => {
   app.use(helmet({ crossOriginResourcePolicy: false }));
   app.use(compression());
   app.use(express.json({ limit: "1mb" }));
-  app.use(cors());
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        return callback(
+          new Error(`CORS blocked for origin: ${origin}`)
+        );
+      },
+      credentials: true,
+    })
+  );
 
   app.use(express.static(path.join(__dirname, "public")));
   app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
