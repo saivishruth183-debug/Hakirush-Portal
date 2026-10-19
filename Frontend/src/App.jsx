@@ -7,6 +7,7 @@ import RootRedirect from "./utils/RootRedirect";
 import EmployeeSetting from "./pages/Setting";
 import Unauthorized from "./pages/Unauthorized";
 import SetupPassword from "./pages/SetupPassword";
+import ForgotPassword from "./pages/ForgotPassword";
 
 /* ================= LAZY LOADED ROUTE COMPONENTS ================= */
 // Code-split to drastically reduce initial JS chunk size and speed up Time-to-Interactive
@@ -81,6 +82,7 @@ const App = () => {
           {/* ROOT & AUTH */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/setup-password" element={<SetupPassword />} />
 
           {/* ================= ADMIN ROUTES ================= */}

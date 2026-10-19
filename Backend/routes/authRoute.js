@@ -6,14 +6,21 @@ import {
   mobileRefresh,
   mobileLogout,
   logoutAll,
-  setupPassword
+  setupPassword,
+  forgotPassword,
+  verifyPasswordResetOtp,
+  resetPassword
 } from "../controllers/authController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import { loginLimiter } from "../middleware/loginRateLimit.js";
+import { passwordResetRequestLimiter } from "../middleware/passwordResetRateLimit.js";
 
 const router = express.Router();
 
 router.post("/login", loginLimiter, login);
+router.post("/forgot-password", passwordResetRequestLimiter, forgotPassword);
+router.post("/verify-otp", verifyPasswordResetOtp);
+router.post("/reset-password", resetPassword);
 router.post("/verify", authMiddleware, verify);
 
 router.post("/mobile/login", loginLimiter, mobileLogin);

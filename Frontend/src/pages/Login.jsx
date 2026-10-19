@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion as Motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import axios from "axios";
 import { useAuth } from "../context/authContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiErrorCode, isNetworkError } from "../utils/apiError";
 import {
   Eye, EyeOff, Lock, Mail, Loader2, AlertCircle, Info, WifiOff, ArrowRight,
@@ -37,6 +37,7 @@ const Login = () => {
 
   const { login, sessionError, offline } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // rotate the highlights on the brand panel
   useEffect(() => {
@@ -271,6 +272,19 @@ const Login = () => {
                   </div>
                 </Motion.div>
               )}
+              {location.state?.passwordResetSuccess && (
+                <Motion.div
+                  key="password-reset-success"
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                  className="overflow-hidden"
+                  role="status"
+                >
+                  <div className="mb-3 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800 ring-1 ring-emerald-200">
+                    <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600" />
+                    <p className="text-sm font-medium">Password updated, please log in.</p>
+                  </div>
+                </Motion.div>
+              )}
             </AnimatePresence>
           </div>
 
@@ -335,6 +349,12 @@ const Login = () => {
               </AnimatePresence>
             </div>
 
+            <div className="-mt-2 text-right">
+              <Link to="/forgot-password" className="text-sm font-semibold text-red-600 transition hover:text-red-700 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             {/* submit */}
             <Motion.button
               type="submit"
@@ -356,10 +376,6 @@ const Login = () => {
               )}
             </Motion.button>
           </Motion.form>
-
-          <p className="mt-6 text-center text-xs text-gray-400">
-            Forgot your password or locked out? Contact your administrator.
-          </p>
 
           <div className="mt-8 flex items-center justify-center gap-2 border-t border-gray-100 pt-6 text-xs font-medium text-gray-400">
             <ShieldCheck size={14} className="text-emerald-500" />

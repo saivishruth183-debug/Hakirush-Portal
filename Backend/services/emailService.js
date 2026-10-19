@@ -10,6 +10,59 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+export const __testHooks = {
+  capturePasswordResetEmail: null,
+};
+
+export const sendPasswordResetOtpEmail = async (user, otp) => {
+  if (process.env.NODE_ENV === "test" && __testHooks.capturePasswordResetEmail) {
+    await __testHooks.capturePasswordResetEmail({ type: "otp", user, otp });
+    return;
+  }
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("WARNING: EMAIL_USER or EMAIL_PASS not configured. Skipping password reset email.");
+    return;
+  }
+
+  await transporter.sendMail({
+    from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: "Hakirush password reset",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff;">
+        <h1 style="margin: 0; color: #7A2233; text-align: center; font-size: 25px;">Hakirush password reset</h1>
+        <p style="margin: 24px 0 12px; color: #334155; text-align: center;">Use this one-time code to reset your password:</p>
+        <p style="margin: 0; color: #7A2233; text-align: center; font-size: 38px; font-weight: 700; letter-spacing: 12px;">${otp}</p>
+        <p style="margin: 20px 0; color: #64748b; text-align: center;">This code expires in 10 minutes.</p>
+        <p style="margin: 0; color: #94a3b8; text-align: center; font-size: 13px;">Please ignore this email if you didn't request a password reset.</p>
+      </div>
+    `,
+  });
+};
+
+export const sendPasswordChangedEmail = async (user) => {
+  if (process.env.NODE_ENV === "test" && __testHooks.capturePasswordResetEmail) {
+    await __testHooks.capturePasswordResetEmail({ type: "changed", user });
+    return;
+  }
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("WARNING: EMAIL_USER or EMAIL_PASS not configured. Skipping password change email.");
+    return;
+  }
+
+  await transporter.sendMail({
+    from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject: "Your password was changed",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff;">
+        <h1 style="margin: 0; color: #7A2233; text-align: center; font-size: 25px;">Your password was changed</h1>
+        <p style="margin: 24px 0 0; color: #334155; text-align: center;">Your Hakirush Portal password has been updated. If you didn't make this change, contact your administrator immediately.</p>
+      </div>
+    `,
+  });
+};
+
 export const sendWelcomeEmail = async (user, employee) => {
   // Generate a special 24-hour setup token
   const setupToken = jwt.sign(
