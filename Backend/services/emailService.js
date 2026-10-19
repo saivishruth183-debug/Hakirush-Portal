@@ -132,6 +132,46 @@ export const sendLeaveStatusEmail = async (employeeUser, leave, status, managerN
   await transporter.sendMail(mailOptions).catch(console.error);
 };
 
+export const sendAssetAssignmentEmail = async (employeeUser, employee, asset) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("WARNING: EMAIL_USER or EMAIL_PASS not configured in .env. Skipping asset assignment email.");
+    return;
+  }
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const mailOptions = {
+    from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
+    to: employeeUser.email,
+    subject: "A company asset has been assigned to you",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+        <h2 style="color: #7A2233; text-align: center;">An asset has been assigned to you</h2>
+        <p>Hello ${escapeHtml(employeeUser.name)},</p>
+        <p>The following company asset has been assigned to you:</p>
+        <ul>
+          <li><strong>Asset:</strong> ${escapeHtml(asset.name)}</li>
+          <li><strong>Type:</strong> ${escapeHtml(asset.assetType)}</li>
+          ${asset.serialNumber ? `<li><strong>Serial number:</strong> ${escapeHtml(asset.serialNumber)}</li>` : ""}
+          <li><strong>Employee ID:</strong> ${escapeHtml(employee.employeeId)}</li>
+          <li><strong>Assigned on:</strong> ${escapeHtml(new Date(asset.issueDate).toISOString().slice(0, 10))}</li>
+        </ul>
+        <p>Please contact your administrator if you have any questions about this asset.</p>
+        <p><a href="${escapeHtml(frontendUrl)}/login" style="color: #7A2233;">Open Hakirush Portal</a></p>
+      </div>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions);
+};
+
 export const sendBirthdayEmail = async (user) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return;
 
