@@ -4,6 +4,7 @@ import { asyncHandler, badRequest, notFound, conflict } from "../middleware/erro
 import { requireObjectId, trimmedString, requireEnum } from "../utils/validate.js";
 import { now as clockNow } from "../services/clock.js";
 import { getEmployeeForUser } from "../services/employeeScope.js";
+import { sendAssetAssignmentEmail } from "../services/emailService.js";
 
 const ASSET_TYPES = ["Laptop", "Monitor", "Mobile", "ID Card", "Keys", "Other"];
 const STATUSES = ["Available", "Assigned", "Maintenance", "Retired"];
@@ -53,7 +54,7 @@ export const assignAsset = asyncHandler(async (req, res) => {
   if (asset.status === "Assigned") throw badRequest("Asset is already assigned to someone.");
   if (asset.status !== "Available") throw badRequest(`Asset cannot be assigned because it is ${asset.status}`);
 
-  const employee = await Employee.findById(employeeId);
+  const employee = await Employee.findById(employeeId).populate("userId", "name email");
   if (!employee) throw notFound("Employee not found");
 
   asset.assignedTo = employee._id;
@@ -61,6 +62,12 @@ export const assignAsset = asyncHandler(async (req, res) => {
   asset.issueDate = clockNow();
   asset.returnDate = null;
   await asset.save();
+
+  try {
+    await sendAssetAssignmentEmail(employee.userId, employee, asset);
+  } catch (err) {
+    console.error("Asset assignment email failed:", err.message);
+  }
 
   await asset.populate({
     path: "assignedTo",
