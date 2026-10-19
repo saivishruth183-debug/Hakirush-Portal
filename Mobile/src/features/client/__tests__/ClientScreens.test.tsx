@@ -85,7 +85,7 @@ describe('Client Home', () => {
   it('shows the own plan and honest empty states (no sample standings, gallery or updates)', async () => {
     mockClientApi({
       'GET /api/client/me': () => jsonResponse(200, { success: true, client: CLIENT }),
-      'GET /api/client/me/performance': () => jsonResponse(200, { success: true, standings: [], updatedAt: null }),
+      'GET /api/client/shared/performance': () => jsonResponse(200, { success: true, standings: [], updatedAt: null }),
       'GET /api/client/me/gallery': () => jsonResponse(200, { success: true, images: [] }),
       'GET /api/announcements/public': () => jsonResponse(200, { success: true, announcements: [] }),
     });
@@ -103,7 +103,7 @@ describe('Client Home', () => {
   it('lists standings by points and opens the tapped gallery image', async () => {
     mockClientApi({
       'GET /api/client/me': () => jsonResponse(200, { success: true, client: CLIENT }),
-      'GET /api/client/me/performance': () =>
+      'GET /api/client/shared/performance': () =>
         jsonResponse(200, {
           success: true,
           standings: [
@@ -134,7 +134,7 @@ describe('Client Home', () => {
   it('shows "Access pending" when no client record is linked (404)', async () => {
     mockClientApi({
       'GET /api/client/me': () => jsonResponse(404, { success: false, error: 'Client profile not found', code: 'NOT_FOUND' }),
-      'GET /api/client/me/performance': () => jsonResponse(200, { success: true, standings: [], updatedAt: null }),
+      'GET /api/client/shared/performance': () => jsonResponse(200, { success: true, standings: [], updatedAt: null }),
       'GET /api/client/me/gallery': () => jsonResponse(200, { success: true, images: [] }),
       'GET /api/announcements/public': () => jsonResponse(200, { success: true, announcements: [] }),
     });

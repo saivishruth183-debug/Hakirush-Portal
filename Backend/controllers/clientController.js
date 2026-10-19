@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import ClientRosterEntry, { JERSEY_SIZES, ROSTER_MAX_ENTRIES, ROSTER_NAME_MAX } from "../models/ClientRosterEntry.js";
 import ClientGalleryImage, { GALLERY_CAPTION_MAX } from "../models/ClientGalleryImage.js";
 import ClientStanding, { STANDINGS_MAX_ROWS, TEAM_NAME_MAX } from "../models/ClientStanding.js";
+import SharedClientStanding from "../models/SharedClientStanding.js";
 import bcrypt from "bcrypt";
 import uploadToImageKit, { deleteFromImageKit, getImageKitClient } from "../utils/uploadToImageKit.js";
 import { ApiError, asyncHandler } from "../middleware/errorHandler.js";
@@ -96,6 +97,25 @@ const getStandingsForClient = async (clientId) => {
     updatedAt: record?.updatedAt || null,
   };
 };
+
+const getSharedClientStandings = asyncHandler(async (req, res) => {
+  const record = await SharedClientStanding.findOne({ scope: "allClients" }).lean();
+  return res.json({
+    success: true,
+    standings: record?.standings || [],
+    updatedAt: record?.updatedAt || null,
+  });
+});
+
+const updateSharedClientStandings = asyncHandler(async (req, res) => {
+  const standings = validateStandings(req.body?.standings);
+  const record = await SharedClientStanding.findOneAndUpdate(
+    { scope: "allClients" },
+    { $set: { standings, updatedBy: req.user._id } },
+    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+  );
+  return res.json({ success: true, standings: record.standings, updatedAt: record.updatedAt });
+});
 
 const validateRosterEntry = (body = {}) => {
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -559,5 +579,7 @@ export {
   deleteMyClientRosterEntry,
   getClientStandings,
   updateClientStandings,
+  getSharedClientStandings,
+  updateSharedClientStandings,
   deleteClientGalleryImage,
-} 
+}

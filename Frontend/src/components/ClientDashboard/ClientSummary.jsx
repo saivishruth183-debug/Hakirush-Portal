@@ -97,7 +97,7 @@ const ClientSportsPlan = () => {
         const [clientRes, annRes, perfRes, imagesRes, rosterRes] = await Promise.all([
           axios.get(`${API}/api/client/me`, { headers }),
           axios.get(`${API}/api/announcements/public`, { headers }),
-          axios.get(`${API}/api/client/me/performance`, { headers }),
+          axios.get(`${API}/api/client/shared/performance`, { headers }),
           axios
             .get(`${API}/api/client/me/gallery`, { headers })
             .catch(() => ({ data: { images: [], sharedImages: [], galleryMonth: "" } })),

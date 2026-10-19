@@ -85,7 +85,7 @@ export function useGallery() {
 
 export function usePerformance() {
   const keys = useQueryKeys();
-  return useApiQuery<PerformanceResponse>(keys.performance(), '/api/client/me/performance');
+  return useApiQuery<PerformanceResponse>(keys.performance(), '/api/client/shared/performance');
 }
 
 export function useClientAnnouncements() {

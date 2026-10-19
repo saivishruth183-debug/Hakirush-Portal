@@ -8,12 +8,12 @@ import {
 } from "lucide-react";
 import { apiErrorMessage } from "../../utils/apiError";
 
-/* Admin-only management of a client's gallery and performance standings.
+/* Admin-only management of client galleries and shared performance standings.
    Endpoints (admin):
    - GET       /api/client/:id/gallery/upload-auth (short-lived ImageKit upload credentials)
    - GET/POST  /api/client/:id/gallery            (POST {fileId, caption})
    - DELETE    /api/client/:id/gallery/:imageId
-   - GET/PUT   /api/client/:id/performance        (PUT {standings:[{teamName,played,won,lost,points}]}) */
+   - GET/PUT  /api/client/shared/performance     (PUT {standings:[{teamName,played,won,lost,points}]}) */
 
 const BACKEND = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
@@ -789,7 +789,7 @@ const FIELD_LABELS = { played: "P", won: "W", lost: "L", points: "Pts" };
 const FIELD_TITLES = { played: "Played", won: "Won", lost: "Lost", points: "Points" };
 const MEDAL = ["bg-amber-400 text-white", "bg-gray-300 text-white", "bg-orange-400 text-white"];
 
-export const ClientStandingsEditor = ({ clientId }) => {
+export const ClientStandingsEditor = () => {
   const [rows, setRows] = useState([]);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -801,7 +801,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
 
   const load = useCallback(async () => {
     try {
-      const res = await axios.get(`${BACKEND}/api/client/${clientId}/performance`, { headers: authHeaders() });
+      const res = await axios.get(`${BACKEND}/api/client/shared/performance`, { headers: authHeaders() });
       const list = Array.isArray(res.data?.standings) ? res.data.standings : [];
       setRows(list.map(toRow));
       setUpdatedAt(res.data?.updatedAt || null);
@@ -812,7 +812,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -873,7 +873,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
         points: Number(r.points),
       }));
       const res = await axios.put(
-        `${BACKEND}/api/client/${clientId}/performance`,
+        `${BACKEND}/api/client/shared/performance`,
         { standings },
         { headers: authHeaders() }
       );
@@ -929,7 +929,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
     <Card
       icon={<Trophy size={18} />}
       title="Performance standings"
-      subtitle={updatedLabel}
+      subtitle={`Shared with all clients · ${updatedLabel}`}
       right={dirty && !loading && !loadError && (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" /> Unsaved changes
@@ -1072,7 +1072,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
           </div>
           <AnimatePresence>
             {saveError && <Notice key="se" onClose={() => setSaveError("")}>{saveError}</Notice>}
-            {saved && <Notice key="sv" tone="ok">Standings saved. The client sees the updated table.</Notice>}
+            {saved && <Notice key="sv" tone="ok">Standings saved. All clients can see the updated table.</Notice>}
           </AnimatePresence>
           <p className="mt-3 text-[11px] text-gray-400">The medals show rank by points as a preview. Teams are saved in the order listed.</p>
         </>

@@ -54,8 +54,8 @@ export function ClientContentScreen() {
   );
   return (
     <>
-      <ScreenTitle title={client.data?.userId?.name ? `${client.data.userId.name} content` : 'Client content'} />
-      {tab === 'gallery' ? <Gallery clientId={id} header={switcher} /> : <StandingsLoader clientId={id} header={switcher} />}
+      <ScreenTitle title={tab === 'standings' ? 'Shared performance standings' : client.data?.userId?.name ? `${client.data.userId.name} content` : 'Client content'} />
+      {tab === 'gallery' ? <Gallery clientId={id} header={switcher} /> : <StandingsLoader header={switcher} />}
     </>
   );
 }
@@ -153,9 +153,9 @@ function Gallery({ clientId, header }: { clientId: string; header: ReactNode }) 
   );
 }
 
-function StandingsLoader({ clientId, header }: { clientId: string; header: ReactNode }) {
+function StandingsLoader({ header }: { header: ReactNode }) {
   const keys = useQueryKeys();
-  const query = useApiQuery<PerformanceResponse>(keys.performance(clientId), `/api/client/${enc(clientId)}/performance`);
+  const query = useApiQuery<PerformanceResponse>(keys.performance(), '/api/client/shared/performance');
   if (!query.data) {
     return (
       <Screen>
@@ -164,18 +164,18 @@ function StandingsLoader({ clientId, header }: { clientId: string; header: React
       </Screen>
     );
   }
-  return <StandingsEditor key={query.data.updatedAt ?? 'empty'} clientId={clientId} data={query.data} header={header} />;
+  return <StandingsEditor key={query.data.updatedAt ?? 'empty'} data={query.data} header={header} />;
 }
 
-export function StandingsEditor({ clientId, data, header }: { clientId: string; data: PerformanceResponse; header: ReactNode }) {
+export function StandingsEditor({ data, header }: { data: PerformanceResponse; header: ReactNode }) {
   const theme = useTheme();
   const keys = useQueryKeys();
   const { canWrite } = useSession();
   const [rows, setRows] = useState<StandingRow[]>(() => rowsFromStandings(data.standings ?? []));
   const [rowErrors, setRowErrors] = useState<Record<number, RowErrors>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const save = useApiMutation((payload: ReturnType<typeof rowsToPayload>) => api.put<PerformanceResponse>(`/api/client/${enc(clientId)}/performance`, { standings: payload }), {
-    invalidate: [keys.performance(clientId)],
+  const save = useApiMutation((payload: ReturnType<typeof rowsToPayload>) => api.put<PerformanceResponse>('/api/client/shared/performance', { standings: payload }), {
+    invalidate: [keys.performance()],
   });
 
   const update = (i: number, field: keyof StandingRow, v: string) => {
@@ -192,7 +192,7 @@ export function StandingsEditor({ clientId, data, header }: { clientId: string; 
       return;
     }
     if (rows.length === 0 && (data.standings?.length ?? 0) > 0) {
-      const ok = await confirm({ title: 'Clear the standings table?', message: 'The client will see no standings until you add teams again.', confirmLabel: 'Clear table', destructive: true });
+      const ok = await confirm({ title: 'Clear the standings table?', message: 'All clients will see no standings until you add teams again.', confirmLabel: 'Clear table', destructive: true });
       if (!ok) return;
     }
     try {
@@ -208,7 +208,7 @@ export function StandingsEditor({ clientId, data, header }: { clientId: string; 
       {header}
       <FormBanner error={formError} offline={!canWrite} />
       <AppText variant="secondary">
-        Saving replaces the whole table the client sees.{data.updatedAt ? ` Last saved ${formatDateTime(data.updatedAt)}.` : ''}
+        This table is shared with all clients. Saving replaces the whole table.{data.updatedAt ? ` Last saved ${formatDateTime(data.updatedAt)}.` : ''}
       </AppText>
       {rows.length === 0 ? <EmptyState icon="trophy-outline" title="No standings yet" message="Add a row for each team to publish a standings table." /> : null}
       {rows.map((r, i) => {

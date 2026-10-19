@@ -27,6 +27,8 @@ import {
   deleteMyClientRosterEntry,
   getClientStandings,
   updateClientStandings,
+  getSharedClientStandings,
+  updateSharedClientStandings,
   deleteClientGalleryImage,
 } from "../controllers/clientController.js";
 
@@ -60,6 +62,13 @@ router.get("/performance", authMiddleware, (req, res, next) => {
   }
   return getClientPerformance(req, res, next);
 });
+router.get("/shared/performance", authMiddleware, (req, res, next) => {
+  if (!["admin", "client"].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, error: "Access denied", code: "FORBIDDEN" });
+  }
+  return getSharedClientStandings(req, res, next);
+});
+router.put("/shared/performance", authMiddleware, requireAdmin, updateSharedClientStandings);
 router.get("/:id/performance", authMiddleware, requireAdmin, getClientStandings);
 router.put("/:id/performance", authMiddleware, requireAdmin, updateClientStandings);
 

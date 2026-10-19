@@ -7,7 +7,7 @@ import {
   UserPlus, Camera, Check, Eye, EyeOff, ArrowLeft, Building2, Mail, KeyRound,
   CalendarDays, Wallet, Crown, CalendarRange, UploadCloud, Trash2, AlertTriangle,
   Loader2, Wand2, Copy, CheckCircle2, X, Sparkles, ShieldCheck,
-  ChevronLeft, ChevronRight, ChevronDown, Fingerprint, Search, RefreshCw,
+  ChevronLeft, ChevronRight, ChevronDown, Fingerprint,
 } from "lucide-react";
 
 const PAGE_BG =
@@ -459,12 +459,6 @@ const AddClient = () => {
   const [loading, setLoading] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [createdClientId, setCreatedClientId] = useState("");
-  const [existingClients, setExistingClients] = useState([]);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [clientsError, setClientsError] = useState("");
-  const [clientIdSearch, setClientIdSearch] = useState("");
-  const [copiedClientId, setCopiedClientId] = useState("");
-  const [clientsReloadKey, setClientsReloadKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   // UI-only
   const [error, setError] = useState(null); // { title, message }
@@ -474,36 +468,6 @@ const AddClient = () => {
   const fileRef = useRef(null);
   const redirectRef = useRef(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    let active = true;
-    const loadClients = async () => {
-      setClientsLoading(true);
-      setClientsError("");
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/client`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        if (!Array.isArray(res.data?.clients)) {
-          throw new Error("The server returned an invalid client list.");
-        }
-        if (active) {
-          setExistingClients(res.data.clients.map((client) => ({
-            id: String(client.clientId || client._id),
-            name: client.userId?.name || "Unnamed client",
-          })));
-        }
-      } catch (loadError) {
-        if (active) {
-          setClientsError(loadError.response?.data?.error || loadError.message || "Couldn't load existing client IDs.");
-        }
-      } finally {
-        if (active) setClientsLoading(false);
-      }
-    };
-    loadClients();
-    return () => { active = false; };
-  }, [clientsReloadKey]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   useEffect(() => () => clearTimeout(redirectRef.current), []);
@@ -577,10 +541,6 @@ const AddClient = () => {
           throw new Error("Client was created but the server did not return its Client ID.");
         }
         setCreatedClientId(res.data.client.clientId);
-        setExistingClients((clients) => [
-          { id: String(res.data.client.clientId), name: formData.name.trim() },
-          ...clients.filter((client) => client.id !== String(res.data.client.clientId)),
-        ]);
         setShowAlert(true);
         redirectRef.current = setTimeout(() => navigate("/admin-dashboard/clients"), REDIRECT_MS);
       }
@@ -602,18 +562,6 @@ const AddClient = () => {
     if (!formData.password) return;
     try { await navigator.clipboard.writeText(formData.password); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
   };
-  const copyExistingClientId = async (clientId) => {
-    try {
-      await navigator.clipboard.writeText(clientId);
-      setCopiedClientId(clientId);
-      setTimeout(() => setCopiedClientId(""), 1500);
-    } catch {
-      setClientsError("Couldn't copy the Client ID. Select and copy it manually.");
-    }
-  };
-  const visibleClients = existingClients.filter((client) =>
-    `${client.name} ${client.id}`.toLowerCase().includes(clientIdSearch.trim().toLowerCase())
-  );
 
   /* progress */
   const checks = [
@@ -710,72 +658,6 @@ const AddClient = () => {
                   </div>
                 )}
               </motion.section>
-
-              <section className={`${CARD} overflow-hidden`}>
-                <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="rounded-xl bg-red-50 p-2 text-red-600"><Fingerprint size={16} /></div>
-                    <div>
-                      <h2 className="text-sm font-bold text-gray-900">Client ID list</h2>
-                      <p className="text-[11px] text-gray-400">{existingClients.length} existing clients</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setClientsReloadKey((key) => key + 1)}
-                    disabled={clientsLoading}
-                    aria-label="Refresh client IDs"
-                    className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-red-600 disabled:opacity-50"
-                  >
-                    <RefreshCw size={14} className={clientsLoading ? "animate-spin" : ""} />
-                  </button>
-                </div>
-                <div className="p-4">
-                  <label className="relative block">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      value={clientIdSearch}
-                      onChange={(event) => setClientIdSearch(event.target.value)}
-                      placeholder="Search name or Client ID"
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-xs outline-none transition focus:border-red-300 focus:bg-white"
-                    />
-                  </label>
-                  {clientsError ? (
-                    <div role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                      <p>{clientsError}</p>
-                      <button type="button" onClick={() => setClientsReloadKey((key) => key + 1)} className="mt-1 font-bold underline">
-                        Retry loading IDs
-                      </button>
-                    </div>
-                  ) : clientsLoading ? (
-                    <p role="status" className="py-5 text-center text-xs text-gray-400">Loading client IDs…</p>
-                  ) : visibleClients.length ? (
-                    <ul className="mt-3 max-h-64 divide-y divide-gray-100 overflow-y-auto">
-                      {visibleClients.map((client) => (
-                        <li key={client.id} className="flex items-center justify-between gap-2 py-2.5">
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold text-gray-800">{client.name}</p>
-                            <p className="truncate font-mono text-[10px] text-gray-400" title={client.id}>{client.id}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => copyExistingClientId(client.id)}
-                            aria-label={`Copy Client ID for ${client.name}`}
-                            className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600"
-                          >
-                            {copiedClientId === client.id ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                            {copiedClientId === client.id ? "Copied" : "Copy"}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="py-5 text-center text-xs text-gray-400">
-                      {existingClients.length ? "No client IDs match your search." : "No clients have been added yet."}
-                    </p>
-                  )}
-                </div>
-              </section>
 
               {/* Live preview card */}
               <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}

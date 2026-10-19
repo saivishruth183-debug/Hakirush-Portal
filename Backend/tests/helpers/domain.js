@@ -12,6 +12,7 @@ export const ensureDomainIndexes = async () => {
     import("../../models/ClientRosterEntry.js"),
     import("../../models/ClientGalleryImage.js"),
     import("../../models/ClientStanding.js"),
+    import("../../models/SharedClientStanding.js"),
   ]);
   for (const m of models) await m.default.init();
 };

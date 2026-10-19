@@ -313,6 +313,32 @@ test("performance: empty until entered (no sample data); admin PUT replaces; iso
   assert.deepEqual(cleared.body.standings, []);
 });
 
+test("shared performance standings are visible to every client and editable by admins only", async () => {
+  const empty = await request(app).get("/api/client/shared/performance").set(auth(A().user));
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body.standings, []);
+  assert.equal(empty.body.updatedAt, null);
+
+  const standings = [
+    { teamName: "Champions", played: 8, won: 6, lost: 2, points: 18 },
+  ];
+  const saved = await request(app)
+    .put("/api/client/shared/performance")
+    .set(auth(fx.admin))
+    .send({ standings });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.standings.length, 1);
+  assert.ok(saved.body.updatedAt);
+
+  const clientA = await request(app).get("/api/client/shared/performance").set(auth(A().user));
+  const clientB = await request(app).get("/api/client/shared/performance").set(auth(B().user));
+  const expected = standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points }));
+  assert.deepEqual(clientA.body.standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points })), expected);
+  assert.deepEqual(clientB.body.standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points })), expected);
+  assert.equal((await request(app).put("/api/client/shared/performance").set(auth(A().user)).send({ standings })).status, 403);
+  assert.equal((await request(app).get("/api/client/shared/performance").set(auth(fx.itDev1.user))).status, 403);
+});
+
 test("admin add client validates input; delete removes roster, gallery and standings", async () => {
   const missingLogo = await request(app).post("/api/client/add").set(auth(fx.admin))
     .field("name", "Client C").field("email", "c@test.local").field("password", "Passw0rd!!")
