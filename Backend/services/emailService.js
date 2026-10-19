@@ -203,12 +203,12 @@ export const sendAssetAssignmentEmail = async (employeeUser, employee, asset) =>
   const mailOptions = {
     from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
     to: employeeUser.email,
-    subject: "A company asset has been assigned to you",
+    subject: "Hakirush asset has been assigned to you",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #7A2233; text-align: center;">An asset has been assigned to you</h2>
         <p>Hello ${escapeHtml(employeeUser.name)},</p>
-        <p>The following company asset has been assigned to you:</p>
+        <p>Hakirush asset has been assigned to you:</p>
         <ul>
           <li><strong>Asset:</strong> ${escapeHtml(asset.name)}</li>
           <li><strong>Type:</strong> ${escapeHtml(asset.assetType)}</li>
