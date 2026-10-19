@@ -4,7 +4,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import { startTestDb, stopTestDb, clearDb, getApp, seedFixtures, auth } from "./helpers/testEnv.js";
 
-let app, fx, Notification, Announcement, Stall, Leave, businessDate, addDays;
+let app, fx, Notification, Announcement, Stall, Leave, Asset, businessDate, addDays;
 
 before(async () => {
   await startTestDb();
@@ -13,6 +13,7 @@ before(async () => {
   Announcement = (await import("../models/Announcement.js")).default;
   Stall = (await import("../models/Stall.js")).default;
   Leave = (await import("../models/Leave.js")).default;
+  Asset = (await import("../models/Asset.js")).default;
   ({ businessDate, addDays } = await import("../utils/orgTime.js"));
 });
 after(async () => { await stopTestDb(); });
@@ -255,5 +256,21 @@ describe("notifications", () => {
     assert.equal((await Notification.findById(n.beaN._id).lean()).seen, false);
     assert.equal((await Notification.findById(n.adminN._id).lean()).seen, false);
     assert.equal((await request(app).patch("/api/notifications/seen-all")).status, 401);
+  });
+});
+
+describe("assets", () => {
+  test("admin assignment saves the asset and returns its assigned employee", async () => {
+    const asset = await Asset.create({ name: "Test Laptop", assetType: "Laptop", serialNumber: "ASSET-001" });
+    const response = await request(app)
+      .post(`/api/asset/${asset._id}/assign`)
+      .set(asAdmin())
+      .send({ employeeId: fx.itDev1.employee._id });
+
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.equal(response.body.asset.status, "Assigned");
+    assert.equal(response.body.asset.assignedTo._id, String(fx.itDev1.employee._id));
+    assert.equal(response.body.asset.assignedTo.userId.email, fx.itDev1.user.email);
+    assert.equal((await Asset.findById(asset._id).lean()).status, "Assigned");
   });
 });
