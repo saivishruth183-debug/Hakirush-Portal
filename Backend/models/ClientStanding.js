@@ -5,6 +5,8 @@ export const TEAM_NAME_MAX = 80;
 
 // One performance table per client; an admin PUT replaces the whole table.
 const standingRowSchema = new mongoose.Schema({
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true },
+  clientName: { type: String, required: true, trim: true },
   teamName: { type: String, required: true, trim: true, maxlength: TEAM_NAME_MAX },
   played: { type: Number, required: true, min: 0 },
   won: { type: Number, required: true, min: 0 },

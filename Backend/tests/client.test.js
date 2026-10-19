@@ -282,6 +282,8 @@ test("performance: empty until entered (no sample data); admin PUT replaces; iso
   const put = await request(app).put(`/api/client/${A().client._id}/performance`).set(auth(fx.admin)).send({ standings });
   assert.equal(put.status, 200);
   assert.equal(put.body.standings.length, 2);
+  assert.equal(put.body.standings[0].clientId, String(A().client._id));
+  assert.equal(put.body.standings[0].clientName, "Client A");
   assert.ok(put.body.updatedAt);
 
   for (const bad of [
@@ -297,7 +299,7 @@ test("performance: empty until entered (no sample data); admin PUT replaces; iso
   }
 
   const meA = await request(app).get("/api/client/me/performance").set(auth(A().user));
-  assert.deepEqual(meA.body.standings.map((s) => s.teamName), ["Super Teacher", "Delta Strikers"]);
+  assert.deepEqual(meA.body.standings, []);
   const meB = await request(app).get("/api/client/me/performance").set(auth(B().user));
   assert.deepEqual(meB.body.standings, []);
   const legacyBforA = await request(app).get(`/api/client/performance?userId=${A().user._id}`).set(auth(B().user));
@@ -320,23 +322,56 @@ test("shared performance standings are visible to every client and editable by a
   assert.equal(empty.body.updatedAt, null);
 
   const standings = [
-    { teamName: "Champions", played: 8, won: 6, lost: 2, points: 18 },
+    { clientId: A().client._id, clientName: "Submitted name is ignored", played: 8, won: 6, lost: 2, points: 999 },
+    { clientId: B().client._id, played: 8, won: 5, lost: 3, points: 999 },
   ];
   const saved = await request(app)
     .put("/api/client/shared/performance")
     .set(auth(fx.admin))
     .send({ standings });
   assert.equal(saved.status, 200);
-  assert.equal(saved.body.standings.length, 1);
+  assert.equal(saved.body.standings.length, 2);
+  assert.deepEqual(saved.body.standings.map(({ clientId, clientName }) => [String(clientId), clientName]), [
+    [String(A().client._id), "Client A"],
+    [String(B().client._id), "Client B"],
+  ]);
+  assert.deepEqual(saved.body.standings.map(({ points }) => points), [12, 10]);
   assert.ok(saved.body.updatedAt);
+
+  const invalidClient = await request(app).put("/api/client/shared/performance")
+    .set(auth(fx.admin))
+    .send({ standings: [{ ...standings[0], clientId: "000000000000000000000000" }] });
+  assert.equal(invalidClient.status, 400);
+  assert.equal((await request(app).put("/api/client/shared/performance")
+    .set(auth(fx.admin))
+    .send({ standings: [standings[0], { ...standings[1], clientId: A().client._id }] })).status, 400);
+  assert.equal((await request(app).put("/api/client/shared/performance")
+    .set(auth(fx.admin))
+    .send({ standings: [{ ...standings[0], won: 7 }] })).status, 400);
 
   const clientA = await request(app).get("/api/client/shared/performance").set(auth(A().user));
   const clientB = await request(app).get("/api/client/shared/performance").set(auth(B().user));
-  const expected = standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points }));
-  assert.deepEqual(clientA.body.standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points })), expected);
-  assert.deepEqual(clientB.body.standings.map(({ teamName, played, won, lost, points }) => ({ teamName, played, won, lost, points })), expected);
+  const expected = [
+    { clientId: String(A().client._id), clientName: "Client A", played: 8, won: 6, lost: 2, points: 12 },
+    { clientId: String(B().client._id), clientName: "Client B", played: 8, won: 5, lost: 3, points: 10 },
+  ];
+  assert.deepEqual(clientA.body.standings, expected);
+  assert.deepEqual(clientB.body.standings, expected);
+  const ownA = await request(app).get("/api/client/me/performance").set(auth(A().user));
+  const ownB = await request(app).get("/api/client/me/performance").set(auth(B().user));
+  assert.deepEqual(ownA.body.standings, [expected[0]]);
+  assert.deepEqual(ownB.body.standings, [expected[1]]);
   assert.equal((await request(app).put("/api/client/shared/performance").set(auth(A().user)).send({ standings })).status, 403);
   assert.equal((await request(app).get("/api/client/shared/performance").set(auth(fx.itDev1.user))).status, 403);
+});
+
+test("admin client name list exposes only id and name to admins", async () => {
+  const adminNames = await request(app).get("/api/client/admin/list").set(auth(fx.admin));
+  assert.equal(adminNames.status, 200);
+  assert.deepEqual(adminNames.body.clients.map(({ name }) => name).sort(), ["Client A", "Client B"]);
+  assert.equal(adminNames.body.clients[0]._id.length, 24);
+  assert.deepEqual(Object.keys(adminNames.body.clients[0]).sort(), ["_id", "name"]);
+  assert.equal((await request(app).get("/api/client/admin/list").set(auth(A().user))).status, 403);
 });
 
 test("admin add client validates input; delete removes roster, gallery and standings", async () => {
@@ -362,6 +397,18 @@ test("admin add client validates input; delete removes roster, gallery and stand
   assert.equal(added.status, 201);
   assert.equal(added.body.client.userId.email, "c@test.local");
   assert.equal(added.body.client.clientId, "CLUB-001");
+  const newClientStanding = await request(app).get("/api/client/shared/performance").set(auth(fx.admin));
+  assert.deepEqual(
+    newClientStanding.body.standings.find((standing) => standing.clientId === added.body.client._id),
+    {
+      clientId: added.body.client._id,
+      clientName: "Client C",
+      played: 0,
+      won: 0,
+      lost: 0,
+      points: 0,
+    }
+  );
   const duplicateClientId = await request(app).post("/api/client/add").set(auth(fx.admin))
     .field("name", "Client D").field("email", "d@test.local").field("password", "Passw0rd!!")
     .field("clientId", "club-001")

@@ -7,6 +7,7 @@ import upload from "../middleware/upload.js";
 import {
   addClient,
   getClients,
+  getAdminClientList,
   getClient,
   getMyClient,
   updateClient,
@@ -72,6 +73,7 @@ router.put("/shared/performance", authMiddleware, requireAdmin, updateSharedClie
 router.get("/:id/performance", authMiddleware, requireAdmin, getClientStandings);
 router.put("/:id/performance", authMiddleware, requireAdmin, updateClientStandings);
 
+router.get("/admin/list", authMiddleware, requireAdmin, getAdminClientList);
 router.get("/", authMiddleware, getClients);
 router.get("/me", authMiddleware, getMyClient);
 router.get("/:id", authMiddleware, getClient);

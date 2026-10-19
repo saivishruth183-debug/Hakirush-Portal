@@ -45,7 +45,7 @@ const getStatusBadgeClass = (status) => {
   }
 };
 
-const getPoints = (t) => t.points ?? (t.won || 0) * 2;
+const getPoints = (t) => (t.won || 0) * 2;
 const getWinRate = (t) => (t.played ? Math.round(((t.won || 0) / t.played) * 100) : 0);
 
 const fadeUp = {
@@ -81,6 +81,7 @@ const ClientSportsPlan = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [performanceData, setPerformanceData] = useState([]);
+  const [sharedPerformanceData, setSharedPerformanceData] = useState([]);
   const [clientImages, setClientImages] = useState([]);
   const [sharedImages, setSharedImages] = useState([]);
   const [galleryMonth, setGalleryMonth] = useState("");
@@ -94,9 +95,10 @@ const ClientSportsPlan = () => {
       try {
         const token = localStorage.getItem("token");
         const headers = { Authorization: `Bearer ${token}` };
-        const [clientRes, annRes, perfRes, imagesRes, rosterRes] = await Promise.all([
+        const [clientRes, annRes, perfRes, sharedPerfRes, imagesRes, rosterRes] = await Promise.all([
           axios.get(`${API}/api/client/me`, { headers }),
           axios.get(`${API}/api/announcements/public`, { headers }),
+          axios.get(`${API}/api/client/me/performance`, { headers }),
           axios.get(`${API}/api/client/shared/performance`, { headers }),
           axios
             .get(`${API}/api/client/me/gallery`, { headers })
@@ -107,6 +109,7 @@ const ClientSportsPlan = () => {
         setClient(found || null);
         setAnnouncements(annRes.data.announcements || []);
         setPerformanceData(perfRes.data.standings || []);
+        setSharedPerformanceData(sharedPerfRes.data.standings || []);
         setClientImages((imagesRes.data.images || []).map((image) => image.url));
         setSharedImages((imagesRes.data.sharedImages || []).map((image) => image.url));
         setGalleryMonth(imagesRes.data.galleryMonth || "");
@@ -140,23 +143,33 @@ const ClientSportsPlan = () => {
     };
   }, [zoomImage, activeAnnouncement, activeEmployee]);
 
-  const sortedTeams = useMemo(
-    () => [...performanceData].sort((a, b) => (b.won || 0) - (a.won || 0) || getPoints(b) - getPoints(a)),
-    [performanceData]
+  const sortedSharedTeams = useMemo(
+    () => sharedPerformanceData
+      .filter((standing) => standing.clientId)
+      .sort(
+      (a, b) => getPoints(b) - getPoints(a) || (b.won || 0) - (a.won || 0) || (a.lost || 0) - (b.lost || 0)
+    ),
+    [sharedPerformanceData]
+  );
+  const ownPerformance = useMemo(
+    () => performanceData.find((standing) => String(standing.clientId) === String(client?._id)) || null,
+    [client?._id, performanceData]
+  );
+  const ownRank = sortedSharedTeams.findIndex(
+    (standing) => String(standing.clientId) === String(client?._id)
   );
 
   const stats = useMemo(() => {
-    const played = performanceData.reduce((s, t) => s + (t.played || 0), 0);
-    const won = performanceData.reduce((s, t) => s + (t.won || 0), 0);
-    const points = performanceData.reduce((s, t) => s + getPoints(t), 0);
+    const played = ownPerformance?.played || 0;
+    const won = ownPerformance?.won || 0;
     return {
-      teams: performanceData.length,
       played,
       won,
-      points,
+      lost: ownPerformance?.lost || 0,
+      points: ownPerformance ? getPoints(ownPerformance) : 0,
       winRate: played ? Math.round((won / played) * 100) : 0,
     };
-  }, [performanceData]);
+  }, [ownPerformance]);
 
   const galleries = useMemo(
     () => {
@@ -237,7 +250,7 @@ const ClientSportsPlan = () => {
           <div className="max-w-6xl mx-auto px-6 md:px-10 -mt-8 pb-16 space-y-10 relative">
             {/* KPI CARDS */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard i={0} icon={Users} label="Squads" value={stats.teams} tone="slate" />
+              <StatCard i={0} icon={Medal} label="Points" value={stats.points} tone="slate" />
               <StatCard i={1} icon={Activity} label="Matches Played" value={stats.played} tone="blue" />
               <StatCard i={2} icon={Trophy} label="Matches Won" value={stats.won} tone="emerald" />
               <StatCard i={3} icon={Target} label="Win Rate" value={`${stats.winRate}%`} tone="red" progress={stats.winRate} />
@@ -245,14 +258,32 @@ const ClientSportsPlan = () => {
 
             {/* PERFORMANCE */}
             <section className="space-y-6">
-              <SectionTitle icon={BarChart3} eyebrow="Live standings" title="Company" accent="Performance" />
-              {sortedTeams.length > 0 ? (
+              <SectionTitle icon={BarChart3} eyebrow="Your live standings" title="Your" accent="Performance" />
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+                <StatCard i={0} icon={Activity} label="Played" value={stats.played} tone="slate" />
+                <StatCard i={1} icon={Trophy} label="Won" value={stats.won} tone="emerald" />
+                <StatCard i={2} icon={X} label="Lost" value={stats.lost} tone="red" />
+                <StatCard i={3} icon={Target} label="Win Rate" value={`${stats.winRate}%`} tone="blue" progress={stats.winRate} />
+                <StatCard i={4} icon={Medal} label="Points" value={stats.points} tone="slate" />
+                <StatCard
+                  i={5}
+                  icon={Crown}
+                  label="Company Rank"
+                  value={ownRank >= 0 ? `Rank ${ownRank + 1} of ${sortedSharedTeams.length}` : "—"}
+                  tone="red"
+                />
+              </div>
+            </section>
+
+            <section className="space-y-6">
+              <SectionTitle icon={BarChart3} eyebrow="Shared standings" title="Company" accent="Performance" />
+              {sortedSharedTeams.length > 0 ? (
                 <>
-                  <Podium teams={sortedTeams.slice(0, 3)} />
-                  <StandingsTable teams={sortedTeams} />
+                  {sortedSharedTeams.length >= 3 && <Podium teams={sortedSharedTeams.slice(0, 3)} />}
+                  <StandingsTable teams={sortedSharedTeams} currentClientId={client?._id} />
                 </>
               ) : (
-                <EmptyState icon={BarChart3} title="No standings yet" text="Performance data will appear here once matches are recorded." />
+                <EmptyState icon={BarChart3} title="No shared standings yet" text="Company-wide performance data will appear here once published." />
               )}
             </section>
 
@@ -748,7 +779,7 @@ const Podium = ({ teams }) => {
         const Icon = s.icon;
         return (
           <motion.div
-            key={t.teamName + rank}
+            key={`${t.clientId}-${rank}`}
             initial="hidden" animate="show" custom={pos} variants={fadeUp}
             className="flex flex-col items-center"
           >
@@ -757,7 +788,7 @@ const Podium = ({ teams }) => {
                 <Icon size={22} className={s.text} />
               </div>
             </div>
-            <p className="text-sm md:text-base font-bold text-slate-900 text-center line-clamp-1 px-1">{t.teamName}</p>
+            <p className="text-sm md:text-base font-bold text-slate-900 text-center line-clamp-1 px-1">{t.clientName || "Unknown client"}</p>
             <p className="text-[11px] font-semibold text-slate-400 mb-3">
               {t.won} wins · {getPoints(t)} pts
             </p>
@@ -783,14 +814,14 @@ const rankBadge = (i) => {
   return "bg-slate-100 text-slate-500";
 };
 
-const StandingsTable = ({ teams }) => (
+const StandingsTable = ({ teams, currentClientId }) => (
   <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden">
     <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse min-w-[640px]">
+      <table className="w-full min-w-[760px] border-collapse text-left">
         <thead>
           <tr className="bg-slate-50/80 border-b border-slate-200/70">
             <th className="py-4 pl-6 pr-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-16">#</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Squad</th>
+            <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Client</th>
             <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">P</th>
             <th className="py-4 px-3 text-[10px] font-bold text-emerald-600 uppercase tracking-wider text-center">W</th>
             <th className="py-4 px-3 text-[10px] font-bold text-red-500 uppercase tracking-wider text-center">L</th>
@@ -801,11 +832,14 @@ const StandingsTable = ({ teams }) => (
         <tbody className="divide-y divide-slate-100">
           {teams.map((team, idx) => {
             const rate = getWinRate(team);
+            const isOwn = String(team.clientId) === String(currentClientId);
             return (
               <motion.tr
-                key={team.teamName + idx}
+                key={team.clientId || idx}
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.04 }}
-                className={`group transition-colors hover:bg-red-50/40 ${idx === 0 ? "bg-amber-50/30" : ""}`}
+                className={`group transition-colors hover:bg-red-50/40 ${
+                  isOwn ? "bg-red-50/40 ring-2 ring-inset ring-red-500" : idx === 0 ? "bg-amber-50/30" : ""
+                }`}
               >
                 <td className="py-4 pl-6 pr-3">
                   <span className={`w-7 h-7 flex items-center justify-center text-xs font-bold rounded-lg ${rankBadge(idx)}`}>
@@ -815,10 +849,11 @@ const StandingsTable = ({ teams }) => (
                 <td className="py-4 px-3">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-                      {(team.teamName || "?").slice(0, 2).toUpperCase()}
+                      {(team.clientName || "?").slice(0, 2).toUpperCase()}
                     </div>
-                    <span className="text-sm font-semibold text-slate-800 group-hover:text-red-600 transition-colors">
-                      {team.teamName}
+                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-800 group-hover:text-red-600 transition-colors">
+                      {team.clientName || "Unknown client"}
+                      {isOwn && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-700">You</span>}
                     </span>
                   </div>
                 </td>

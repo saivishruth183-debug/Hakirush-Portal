@@ -1,5 +1,6 @@
 import Client from "../models/Client.js";
 import User from "../models/User.js";
+import mongoose from "mongoose";
 import ClientRosterEntry, { JERSEY_SIZES, ROSTER_MAX_ENTRIES, ROSTER_NAME_MAX } from "../models/ClientRosterEntry.js";
 import ClientGalleryImage, { GALLERY_CAPTION_MAX } from "../models/ClientGalleryImage.js";
 import ClientStanding, { STANDINGS_MAX_ROWS, TEAM_NAME_MAX } from "../models/ClientStanding.js";
@@ -89,26 +90,51 @@ const verifyGalleryUpload = async (fileId) => {
   }
 };
 
-const getStandingsForClient = async (clientId) => {
-  const record = await ClientStanding.findOne({ clientId }).lean();
+const getStandingsForClient = async (client) => {
+  const record = await ClientStanding.findOne({ clientId: client._id }).lean();
   return {
     success: true,
-    standings: record?.standings || [],
+    standings: (record?.standings || []).map((standing) => ({
+      ...standing,
+      clientId: standing.clientId || client._id,
+      clientName: standing.clientName || client.userId?.name || "",
+    })),
     updatedAt: record?.updatedAt || null,
   };
 };
 
 const getSharedClientStandings = asyncHandler(async (req, res) => {
   const record = await SharedClientStanding.findOne({ scope: "allClients" }).lean();
+  const rows = record?.standings || [];
+  const clientIds = rows
+    .map((standing) => standing.clientId)
+    .filter((clientId) => clientId && mongoose.isObjectIdOrHexString(clientId));
+  const clients = clientIds.length
+    ? await Client.find({ _id: { $in: clientIds } }).populate("userId", "name").lean()
+    : [];
+  const clientsById = new Map(clients.map((client) => [String(client._id), client]));
   return res.json({
     success: true,
-    standings: record?.standings || [],
+    standings: rows.map((standing) => {
+      const clientId = standing.clientId && mongoose.isObjectIdOrHexString(standing.clientId)
+        ? String(standing.clientId)
+        : null;
+      const client = clientId ? clientsById.get(clientId) : null;
+      return {
+        clientId,
+        clientName: client?.userId?.name || standing.clientName || "",
+        played: standing.played ?? 0,
+        won: standing.won ?? 0,
+        lost: standing.lost ?? 0,
+        points: (standing.won ?? 0) * 2,
+      };
+    }),
     updatedAt: record?.updatedAt || null,
   });
 });
 
 const updateSharedClientStandings = asyncHandler(async (req, res) => {
-  const standings = validateStandings(req.body?.standings);
+  const standings = await validateSharedStandings(req.body?.standings);
   const record = await SharedClientStanding.findOneAndUpdate(
     { scope: "allClients" },
     { $set: { standings, updatedBy: req.user._id } },
@@ -116,6 +142,60 @@ const updateSharedClientStandings = asyncHandler(async (req, res) => {
   );
   return res.json({ success: true, standings: record.standings, updatedAt: record.updatedAt });
 });
+
+const validateSharedStandings = async (standings) => {
+  if (!Array.isArray(standings) || standings.length > STANDINGS_MAX_ROWS) {
+    throw new ApiError(400, `Standings must contain 0-${STANDINGS_MAX_ROWS} rows`, "VALIDATION_ERROR");
+  }
+
+  const seen = new Set();
+  const entries = standings.map((row, index) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new ApiError(400, `Row ${index + 1} must be an object`, "VALIDATION_ERROR");
+    }
+    const submittedClientId = row?.clientId;
+    if (!submittedClientId || !mongoose.isObjectIdOrHexString(submittedClientId)) {
+      throw new ApiError(400, `Row ${index + 1}: clientId must reference an existing client`, "VALIDATION_ERROR");
+    }
+    const clientId = String(submittedClientId).toLowerCase();
+    if (seen.has(clientId)) {
+      throw new ApiError(400, `Row ${index + 1}: duplicate clientId`, "VALIDATION_ERROR");
+    }
+    seen.add(clientId);
+
+    const numbers = {};
+    for (const field of ["played", "won", "lost"]) {
+      if (!Number.isSafeInteger(row[field]) || row[field] < 0) {
+        throw new ApiError(400, `Row ${index + 1}: ${field} must be a non-negative whole number`, "VALIDATION_ERROR");
+      }
+      numbers[field] = row[field];
+    }
+    if (numbers.won + numbers.lost > numbers.played) {
+      throw new ApiError(400, `Row ${index + 1}: won + lost cannot exceed played`, "VALIDATION_ERROR");
+    }
+    if (!Number.isSafeInteger(numbers.won * 2)) {
+      throw new ApiError(400, `Row ${index + 1}: points exceed the supported range`, "VALIDATION_ERROR");
+    }
+    return { clientId, ...numbers, points: numbers.won * 2 };
+  });
+
+  const clients = await Client.find({ _id: { $in: entries.map((entry) => entry.clientId) } })
+    .populate("userId", "name")
+    .lean();
+  const clientsById = new Map(clients.map((client) => [String(client._id).toLowerCase(), client]));
+
+  return entries.map((entry, index) => {
+    const client = clientsById.get(entry.clientId);
+    if (!client) {
+      throw new ApiError(400, `Row ${index + 1}: clientId must reference an existing client`, "VALIDATION_ERROR");
+    }
+    return {
+      ...entry,
+      clientId: client._id,
+      clientName: client.userId?.name || "",
+    };
+  });
+};
 
 const validateRosterEntry = (body = {}) => {
   const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -173,19 +253,25 @@ const deleteMyClientRosterEntry = asyncHandler(async (req, res) => {
   return res.json({ success: true, message: "Roster entry deleted" });
 });
 
-const validateStandings = (standings) => {
+const validateStandings = async (standings, defaultClient = null) => {
   if (!Array.isArray(standings) || standings.length > STANDINGS_MAX_ROWS) {
     throw new ApiError(400, `Standings must contain 0-${STANDINGS_MAX_ROWS} rows`, "VALIDATION_ERROR");
   }
   const seen = new Set();
-  return standings.map((row, index) => {
+  const entries = standings.map((row, index) => {
     const teamName = typeof row?.teamName === "string" ? row.teamName.trim() : "";
     if (!teamName || teamName.length > TEAM_NAME_MAX) {
       throw new ApiError(400, `Row ${index + 1}: team name must be 1-${TEAM_NAME_MAX} characters`, "VALIDATION_ERROR");
     }
-    const key = teamName.toLocaleLowerCase();
-    if (seen.has(key)) throw new ApiError(400, `Row ${index + 1}: duplicate team name`, "VALIDATION_ERROR");
-    seen.add(key);
+
+    const submittedClientId = row?.clientId || defaultClient?._id;
+    if (!submittedClientId || !mongoose.isObjectIdOrHexString(submittedClientId)) {
+      throw new ApiError(400, `Row ${index + 1}: clientId must reference an existing client`, "VALIDATION_ERROR");
+    }
+    const clientId = String(submittedClientId);
+    if (defaultClient && clientId !== String(defaultClient._id)) {
+      throw new ApiError(400, `Row ${index + 1}: clientId does not match this client`, "VALIDATION_ERROR");
+    }
 
     const numbers = {};
     for (const field of ["played", "won", "lost", "points"]) {
@@ -197,7 +283,28 @@ const validateStandings = (standings) => {
     if (numbers.won + numbers.lost > numbers.played) {
       throw new ApiError(400, `Row ${index + 1}: won + lost cannot exceed played`, "VALIDATION_ERROR");
     }
-    return { teamName, ...numbers };
+    const key = `${clientId}:${teamName.toLocaleLowerCase()}`;
+    if (seen.has(key)) throw new ApiError(400, `Row ${index + 1}: duplicate team name for client`, "VALIDATION_ERROR");
+    seen.add(key);
+    return { clientId, teamName, ...numbers };
+  });
+
+  const clientIds = [...new Set(entries.map((entry) => entry.clientId))];
+  const clients = defaultClient
+    ? [defaultClient]
+    : await Client.find({ _id: { $in: clientIds } }).populate("userId", "name").lean();
+  const clientsById = new Map(clients.map((client) => [String(client._id), client]));
+
+  return entries.map((entry, index) => {
+    const client = clientsById.get(entry.clientId);
+    if (!client) {
+      throw new ApiError(400, `Row ${index + 1}: clientId must reference an existing client`, "VALIDATION_ERROR");
+    }
+    return {
+      ...entry,
+      clientId: client._id,
+      clientName: client.userId?.name || "",
+    };
   });
 };
 
@@ -265,6 +372,7 @@ const addClient = async (req, res) => {
       companyLogo: logoUrl,
     });
     const client = await Client.findById(createdClient._id).populate("userId", "-password");
+    await ensureSharedClientStanding(client);
 
     res.status(201).json({
       success: true,
@@ -279,6 +387,32 @@ const addClient = async (req, res) => {
   }
 };
 
+const ensureSharedClientStanding = async (client) => {
+  await SharedClientStanding.findOneAndUpdate(
+    { scope: "allClients" },
+    { $setOnInsert: { scope: "allClients", standings: [] } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  await SharedClientStanding.updateOne(
+    {
+      scope: "allClients",
+      "standings.clientId": { $ne: client._id },
+    },
+    {
+      $push: {
+        standings: {
+          clientId: client._id,
+          clientName: client.userId?.name || "",
+          played: 0,
+          won: 0,
+          lost: 0,
+          points: 0,
+        },
+      },
+    }
+  );
+};
+
 /* ================= GET ALL CLIENTS ================= */
 const getClients = async (req, res) => {
   try {
@@ -288,6 +422,16 @@ const getClients = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
+const getAdminClientList = asyncHandler(async (req, res) => {
+  const clients = await Client.find()
+    .populate("userId", "name")
+    .lean();
+  return res.json({
+    success: true,
+    clients: clients.map((client) => ({ _id: client._id, name: client.userId?.name || "" })),
+  });
+});
 
 /* ================= GET SINGLE CLIENT ================= */
 const getClient = async (req, res) => {
@@ -523,21 +667,35 @@ const deleteSharedGalleryImage = asyncHandler(async (req, res) => {
 });
 
 const getMyClientPerformance = asyncHandler(async (req, res) => {
-  const client = await Client.findOne({ userId: req.user._id });
+  const client = await Client.findOne({ userId: req.user._id }).populate("userId", "name");
   if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
-  return res.json(await getStandingsForClient(client._id));
+  const record = await SharedClientStanding.findOne({ scope: "allClients" }).lean();
+  const ownStanding = record?.standings?.find(
+    (standing) => String(standing.clientId || "") === String(client._id)
+  );
+  const standings = ownStanding
+    ? [{
+        clientId: client._id,
+        clientName: client.userId?.name || ownStanding.clientName || "",
+        played: ownStanding.played ?? 0,
+        won: ownStanding.won ?? 0,
+        lost: ownStanding.lost ?? 0,
+        points: (ownStanding.won ?? 0) * 2,
+      }]
+    : [];
+  return res.json({ success: true, standings, updatedAt: record?.updatedAt || null });
 });
 
 const getClientStandings = asyncHandler(async (req, res) => {
-  const client = await Client.findById(req.params.id);
+  const client = await Client.findById(req.params.id).populate("userId", "name");
   if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
-  return res.json(await getStandingsForClient(client._id));
+  return res.json(await getStandingsForClient(client));
 });
 
 const updateClientStandings = asyncHandler(async (req, res) => {
-  const client = await Client.findById(req.params.id);
+  const client = await Client.findById(req.params.id).populate("userId", "name");
   if (!client) throw new ApiError(404, "Client not found", "NOT_FOUND");
-  const standings = validateStandings(req.body?.standings);
+  const standings = await validateStandings(req.body?.standings, client);
   const record = await ClientStanding.findOneAndUpdate(
     { clientId: client._id },
     { $set: { standings, updatedBy: req.user._id } },
@@ -559,6 +717,7 @@ const deleteClientGalleryImage = asyncHandler(async (req, res) => {
 export {
   addClient,
   getClients,
+  getAdminClientList,
   getClient,
   getMyClient,
   updateClient,

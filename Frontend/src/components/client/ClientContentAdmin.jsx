@@ -34,13 +34,13 @@ const ClientContentAdmin = () => {
             </div>
           </div>
           <p className="mt-3 max-w-2xl text-sm text-white/70">
-            Manage the monthly highlight gallery and publish one performance table shared with all clients.
+            Manage the monthly highlight gallery and {id ? "this client's performance standings." : "performance standings shared with all clients."}
           </p>
         </header>
 
         <div className="mt-6 space-y-6">
           <SharedGalleryManager />
-          <ClientStandingsEditor />
+          <ClientStandingsEditor clientId={id} />
         </div>
       </div>
     </main>

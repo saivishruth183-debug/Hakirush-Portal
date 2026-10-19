@@ -5,15 +5,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ImagePlus, Trash2, Loader2, Plus, Save, Trophy, Images, RefreshCw, UploadCloud,
   X, AlertTriangle, CheckCircle2, ZoomIn, ChevronLeft, ChevronRight, Type, Medal,
+  Search,
 } from "lucide-react";
 import { apiErrorMessage } from "../../utils/apiError";
 
-/* Admin-only management of client galleries and shared performance standings.
+/* Admin-only management of client galleries and performance standings.
    Endpoints (admin):
    - GET       /api/client/:id/gallery/upload-auth (short-lived ImageKit upload credentials)
    - GET/POST  /api/client/:id/gallery            (POST {fileId, caption})
    - DELETE    /api/client/:id/gallery/:imageId
-   - GET/PUT  /api/client/shared/performance     (PUT {standings:[{teamName,played,won,lost,points}]}) */
+   - GET/PUT  /api/client/:id/performance       (PUT {standings:[{teamName,played,won,lost,points}]})
+   - GET/PUT  /api/client/shared/performance     (PUT {standings:[{clientId,played,won,lost}]})
+   - GET       /api/client/admin/list           (admin client names for shared standings) */
 
 const BACKEND = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
@@ -774,10 +777,23 @@ export const ClientGalleryManager = ({ clientId }) => {
 };
 
 /* ================= PERFORMANCE STANDINGS ================= */
-const emptyRow = () => ({ key: `new-${Math.random().toString(36).slice(2)}`, teamName: "", played: "0", won: "0", lost: "0", points: "0" });
+const emptyRow = (clientId = "") => ({
+  key: `new-${Math.random().toString(36).slice(2)}`,
+  clientId,
+  clientName: "",
+  unassigned: false,
+  teamName: "",
+  played: "0",
+  won: "0",
+  lost: "0",
+  points: "0",
+});
 
-const toRow = (s, i) => ({
+const toRow = (s, i, defaultClientId = "") => ({
   key: s._id || `row-${i}`,
+  clientId: String(s.clientId || defaultClientId || ""),
+  clientName: s.clientName || "",
+  unassigned: !s.clientId && !defaultClientId,
   teamName: s.teamName || "",
   played: String(s.played ?? 0),
   won: String(s.won ?? 0),
@@ -789,7 +805,64 @@ const FIELD_LABELS = { played: "P", won: "W", lost: "L", points: "Pts" };
 const FIELD_TITLES = { played: "Played", won: "Won", lost: "Lost", points: "Points" };
 const MEDAL = ["bg-amber-400 text-white", "bg-gray-300 text-white", "bg-orange-400 text-white"];
 
-export const ClientStandingsEditor = () => {
+const ClientPicker = ({ clients, value, onChange, invalid, unassigned, usedClientIds = [] }) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = clients.find((client) => String(client._id) === value);
+  const filteredClients = clients.filter((client) => String(client.name || "").toLowerCase().includes(query.trim().toLowerCase()));
+
+  return (
+    <div className="relative min-w-[11rem]">
+      <div className={`flex items-center gap-2 rounded-xl bg-white px-3 ring-1 transition focus-within:ring-2 ${
+        invalid ? "ring-red-300 focus-within:ring-red-400" : "ring-gray-200 focus-within:ring-red-400"
+      }`}>
+        <Search size={14} className="shrink-0 text-gray-400" />
+        <input
+          aria-label="Client"
+          aria-expanded={open}
+          role="combobox"
+          value={open ? query : selected?.name || (unassigned ? "Unassigned" : "")}
+          placeholder="Select client"
+          onFocus={() => { setQuery(""); setOpen(true); }}
+          onChange={(event) => setQuery(event.target.value)}
+          onBlur={() => setOpen(false)}
+          className="w-full min-w-0 py-2 text-sm font-medium text-gray-800 outline-none placeholder:font-normal placeholder:text-gray-300"
+        />
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl bg-white p-1 shadow-xl ring-1 ring-gray-200">
+          {filteredClients.length ? filteredClients.map((client) => {
+            const clientId = String(client._id);
+            const usedElsewhere = usedClientIds.includes(clientId);
+            return (
+              <button
+                key={client._id}
+                type="button"
+                disabled={usedElsewhere}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => { onChange(clientId, client.name); setOpen(false); }}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                  usedElsewhere
+                    ? "cursor-not-allowed text-gray-300"
+                    : clientId === value
+                      ? "bg-red-50 font-semibold text-red-700"
+                      : "text-gray-700 hover:bg-red-50 hover:text-red-700"
+                }`}
+              >
+                {client.name}{usedElsewhere ? " · already added" : ""}
+              </button>
+            );
+          }) : <p className="px-3 py-2 text-xs text-gray-400">No clients found.</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ClientStandingsEditor = ({ clientId }) => {
+  const performanceUrl = clientId
+    ? `${BACKEND}/api/client/${clientId}/performance`
+    : `${BACKEND}/api/client/shared/performance`;
   const [rows, setRows] = useState([]);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -798,12 +871,16 @@ export const ClientStandingsEditor = () => {
   const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false); // UI-only
+  const [clients, setClients] = useState([]);
 
   const load = useCallback(async () => {
     try {
-      const res = await axios.get(`${BACKEND}/api/client/shared/performance`, { headers: authHeaders() });
+      const requests = [axios.get(performanceUrl, { headers: authHeaders() })];
+      if (!clientId) requests.push(axios.get(`${BACKEND}/api/client/admin/list`, { headers: authHeaders() }));
+      const [res, clientsRes] = await Promise.all(requests);
       const list = Array.isArray(res.data?.standings) ? res.data.standings : [];
-      setRows(list.map(toRow));
+      setRows(list.map((standing, index) => toRow(standing, index, clientId)));
+      if (clientsRes) setClients(Array.isArray(clientsRes.data?.clients) ? clientsRes.data.clients : []);
       setUpdatedAt(res.data?.updatedAt || null);
       setLoadError("");
       setDirty(false);
@@ -812,7 +889,7 @@ export const ClientStandingsEditor = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clientId, performanceUrl]);
 
   useEffect(() => {
     load();
@@ -827,7 +904,7 @@ export const ClientStandingsEditor = () => {
   const addRow = () => {
     setSaved(false);
     setDirty(true);
-    setRows((prev) => [...prev, emptyRow()]);
+    setRows((prev) => [...prev, emptyRow(clientId)]);
   };
 
   const removeRow = (key) => {
@@ -840,11 +917,19 @@ export const ClientStandingsEditor = () => {
   const validate = () => {
     const seen = new Set();
     for (const [i, r] of rows.entries()) {
-      const name = r.teamName.trim();
-      if (!name) return `Row ${i + 1}: team name is required.`;
-      if (seen.has(name.toLowerCase())) return `Row ${i + 1}: duplicate team name "${name}".`;
-      seen.add(name.toLowerCase());
-      for (const f of NUMERIC_FIELDS) {
+      if (!clientId) {
+        if (!r.clientId) return `Row ${i + 1}: client is required.`;
+        if (seen.has(r.clientId)) return `Row ${i + 1}: each client can only be listed once.`;
+        seen.add(r.clientId);
+      }
+      if (clientId) {
+        const name = r.teamName.trim();
+        if (!name) return `Row ${i + 1}: team name is required.`;
+        const key = `${r.clientId}:${name.toLowerCase()}`;
+        if (seen.has(key)) return `Row ${i + 1}: duplicate team name "${name}" for this client.`;
+        seen.add(key);
+      }
+      for (const f of clientId ? NUMERIC_FIELDS : ["played", "won", "lost"]) {
         if (!/^\d+$/.test(String(r[f]).trim())) return `Row ${i + 1}: ${f} must be a whole number (0 or more).`;
       }
       if (Number(r.won) + Number(r.lost) > Number(r.played)) {
@@ -865,19 +950,26 @@ export const ClientStandingsEditor = () => {
     setSaveError("");
     setSaved(false);
     try {
-      const standings = rows.map((r) => ({
-        teamName: r.teamName.trim(),
-        played: Number(r.played),
-        won: Number(r.won),
-        lost: Number(r.lost),
-        points: Number(r.points),
-      }));
+      const standings = rows.map((r) => clientId
+        ? {
+            teamName: r.teamName.trim(),
+            played: Number(r.played),
+            won: Number(r.won),
+            lost: Number(r.lost),
+            points: Number(r.points),
+          }
+        : {
+            clientId: r.clientId,
+            played: Number(r.played),
+            won: Number(r.won),
+            lost: Number(r.lost),
+          });
       const res = await axios.put(
-        `${BACKEND}/api/client/shared/performance`,
+        performanceUrl,
         { standings },
         { headers: authHeaders() }
       );
-      if (Array.isArray(res.data?.standings)) setRows(res.data.standings.map(toRow));
+      if (Array.isArray(res.data?.standings)) setRows(res.data.standings.map((standing, index) => toRow(standing, index, clientId)));
       setUpdatedAt(res.data?.updatedAt || new Date().toISOString());
       setSaved(true);
       setDirty(false);
@@ -897,27 +989,42 @@ export const ClientStandingsEditor = () => {
   /* per-row inline problems (UI hints only; validate() is still the gate) */
   const rowIssues = useMemo(() => {
     const counts = {};
-    rows.forEach((r) => { const n = r.teamName.trim().toLowerCase(); if (n) counts[n] = (counts[n] || 0) + 1; });
+    rows.forEach((r) => {
+      const key = clientId ? `${r.clientId}:${r.teamName.trim().toLowerCase()}` : r.clientId;
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    });
     const out = {};
     rows.forEach((r) => {
       const issues = {};
       const n = r.teamName.trim().toLowerCase();
-      if (n && counts[n] > 1) issues.teamName = "Duplicate team";
-      NUMERIC_FIELDS.forEach((f) => { if (!/^\d+$/.test(String(r[f]).trim())) issues[f] = "Whole number"; });
+      const key = clientId ? `${r.clientId}:${n}` : r.clientId;
+      if (!clientId && !r.clientId) issues.clientId = "Client required";
+      if (!clientId && r.clientId && counts[key] > 1) issues.clientId = "Duplicate client";
+      if (clientId && n && counts[key] > 1) issues.teamName = "Duplicate team";
+      (clientId ? NUMERIC_FIELDS : ["played", "won", "lost"]).forEach((f) => {
+        if (!/^\d+$/.test(String(r[f]).trim())) issues[f] = "Whole number";
+      });
       if (!issues.won && !issues.lost && !issues.played && Number(r.won) + Number(r.lost) > Number(r.played)) {
         issues.won = issues.lost = "W + L > P";
       }
       out[r.key] = issues;
     });
     return out;
-  }, [rows]);
+  }, [clientId, rows]);
 
-  /* rank by points (display only — saved order is unchanged) */
+  /* Rank by points, wins, and then fewest losses. */
   const rankOf = useMemo(() => {
-    const sorted = [...rows].filter((r) => r.teamName.trim()).sort((a, b) => Number(b.points) - Number(a.points) || Number(b.won) - Number(a.won));
+    const rowPoints = (row) => clientId ? Number(row.points) : Number(row.won) * 2;
+    const sorted = [...rows].filter((r) => clientId ? r.teamName.trim() : r.clientId).sort(
+      (a, b) => rowPoints(b) - rowPoints(a) || Number(b.won) - Number(a.won) || Number(a.lost) - Number(b.lost)
+    );
     const m = {};
     sorted.forEach((r, i) => { m[r.key] = i; });
     return m;
+  }, [clientId, rows]);
+
+  const displayRows = useMemo(() => {
+    return rows.map((row) => ({ type: "team", row }));
   }, [rows]);
 
   const numCls = (bad) =>
@@ -929,7 +1036,7 @@ export const ClientStandingsEditor = () => {
     <Card
       icon={<Trophy size={18} />}
       title="Performance standings"
-      subtitle={`Shared with all clients · ${updatedLabel}`}
+      subtitle={`${clientId ? "Visible to this client" : "Shared with all clients"} · ${updatedLabel}`}
       right={dirty && !loading && !loadError && (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" /> Unsaved changes
@@ -950,7 +1057,7 @@ export const ClientStandingsEditor = () => {
                 <thead>
                   <tr className="bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     <th className="w-12 py-3 pl-4 pr-2">#</th>
-                    <th className="min-w-[10rem] px-2 py-3">Team</th>
+                    <th className="min-w-[10rem] px-2 py-3">{clientId ? "Team" : "Client"}</th>
                     {NUMERIC_FIELDS.map((f) => (
                       <th key={f} className="w-20 px-2 py-3 text-center" title={FIELD_TITLES[f]}>
                         <span className="sm:hidden">{FIELD_LABELS[f]}</span>
@@ -963,7 +1070,8 @@ export const ClientStandingsEditor = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   <AnimatePresence initial={false}>
-                    {rows.map((r) => {
+                    {displayRows.map((displayRow) => {
+                      const { row: r } = displayRow;
                       const issues = rowIssues[r.key] || {};
                       const rank = rankOf[r.key];
                       const played = Number(r.played) || 0;
@@ -980,7 +1088,27 @@ export const ClientStandingsEditor = () => {
                               </span>
                             ) : <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-50 text-xs text-gray-300">–</span>}
                           </td>
-                          <td className="px-2 py-2">
+                          {!clientId && (
+                            <td className="px-2 py-2 align-top">
+                              <ClientPicker
+                                clients={clients}
+                                value={r.clientId}
+                                unassigned={r.unassigned}
+                                usedClientIds={rows
+                                  .filter((entry) => entry.key !== r.key && entry.clientId)
+                                  .map((entry) => entry.clientId)}
+                                invalid={!!issues.clientId}
+                                onChange={(value, name) => {
+                                  setSaved(false);
+                                  setDirty(true);
+                                  setRows((prev) => prev.map((entry) => entry.key === r.key
+                                    ? { ...entry, clientId: value, clientName: name, unassigned: false }
+                                    : entry));
+                                }}
+                              />
+                            </td>
+                          )}
+                          {clientId && <td className="px-2 py-2">
                             <input
                               aria-label="Team name"
                               value={r.teamName}
@@ -992,10 +1120,14 @@ export const ClientStandingsEditor = () => {
                               }`}
                               title={issues.teamName || undefined}
                             />
-                          </td>
-                          {NUMERIC_FIELDS.map((f) => (
+                          </td>}
+                          {(clientId ? NUMERIC_FIELDS : ["played", "won", "lost", "points"]).map((f) => (
                             <td key={f} className="px-2 py-2">
-                              <input
+                              {!clientId && f === "points" ? (
+                                <div aria-label="Points" className="rounded-xl bg-slate-50 px-2 py-2 text-center text-sm font-bold tabular-nums text-slate-700 ring-1 ring-slate-100">
+                                  {(Number(r.won) || 0) * 2}
+                                </div>
+                              ) : <input
                                 aria-label={f}
                                 type="number"
                                 min="0"
@@ -1006,7 +1138,7 @@ export const ClientStandingsEditor = () => {
                                 onChange={(e) => updateRow(r.key, f, e.target.value)}
                                 className={numCls(!!issues[f])}
                                 title={issues[f] || undefined}
-                              />
+                              />}
                             </td>
                           ))}
                           <td className="hidden px-2 py-2 md:table-cell">
@@ -1052,7 +1184,7 @@ export const ClientStandingsEditor = () => {
               onClick={addRow}
               className="flex items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-red-600 ring-1 ring-red-200 transition hover:bg-red-50"
             >
-              <Plus size={16} /> Add team
+              <Plus size={16} /> {clientId ? "Add team" : "Add client"}
             </button>
             {dirty && (
               <button type="button" onClick={() => { setLoading(true); setSaveError(""); load(); }}
@@ -1072,9 +1204,13 @@ export const ClientStandingsEditor = () => {
           </div>
           <AnimatePresence>
             {saveError && <Notice key="se" onClose={() => setSaveError("")}>{saveError}</Notice>}
-            {saved && <Notice key="sv" tone="ok">Standings saved. All clients can see the updated table.</Notice>}
+            {saved && (
+              <Notice key="sv" tone="ok">
+                {clientId ? "Standings saved for this client." : "Standings saved. All clients can see the updated table."}
+              </Notice>
+            )}
           </AnimatePresence>
-          <p className="mt-3 text-[11px] text-gray-400">The medals show rank by points as a preview. Teams are saved in the order listed.</p>
+          <p className="mt-3 text-[11px] text-gray-400">The medals show rank by points, wins, then fewest losses. Rows are saved in the order listed.</p>
         </>
       )}
     </Card>

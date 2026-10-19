@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
-import { STANDINGS_MAX_ROWS, TEAM_NAME_MAX } from "./ClientStanding.js";
+import { STANDINGS_MAX_ROWS } from "./ClientStanding.js";
 
 const standingRowSchema = new mongoose.Schema({
-  teamName: { type: String, required: true, trim: true, maxlength: TEAM_NAME_MAX },
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true },
+  clientName: { type: String, required: true, trim: true },
   played: { type: Number, required: true, min: 0 },
   won: { type: Number, required: true, min: 0 },
   lost: { type: Number, required: true, min: 0 },
