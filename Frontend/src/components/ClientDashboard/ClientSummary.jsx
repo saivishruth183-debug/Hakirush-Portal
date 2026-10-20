@@ -317,6 +317,12 @@ const ClientSportsPlan = () => {
               </div>
             </section>
 
+            {/* LEAGUE TABLE */}
+            <section className="space-y-6">
+              <SectionTitle icon={Trophy} eyebrow="Shared standings" title="League" accent="Table" />
+              <LeagueTable teams={sortedSharedTeams} currentClientId={client?._id} />
+            </section>
+
             {/* EMPLOYEES */}
             <section className="space-y-6">
               <SectionTitle icon={Users} eyebrow="Registered players" title="Roster" accent="Details" />
@@ -602,6 +608,220 @@ const EmptyState = ({ icon: Icon, title, text, compact }) => (
     <p className="text-sm text-slate-400 mt-1 max-w-xs">{text}</p>
   </div>
 );
+
+/* ================= LEAGUE TABLE ================= */
+const winRateOf = (t) => (t.played ? Math.round(((t.won || 0) / t.played) * 100) : 0);
+const MEDALS = [
+  { ring: "from-amber-300 to-amber-500", text: "text-amber-700", soft: "bg-amber-50", label: "1st" },
+  { ring: "from-slate-300 to-slate-400", text: "text-slate-600", soft: "bg-slate-50", label: "2nd" },
+  { ring: "from-orange-300 to-amber-700", text: "text-amber-800", soft: "bg-orange-50", label: "3rd" },
+];
+const TOP_N = 10;
+
+const RankBadge = ({ index, own }) => {
+  const m = MEDALS[index];
+  if (m) {
+    return (
+      <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${m.ring} text-sm font-black text-white shadow-md`}>
+        {index === 0 ? <Crown size={16} /> : index + 1}
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${own ? "bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-md shadow-red-600/30" : "bg-slate-100 text-slate-500"}`}>
+      {index + 1}
+    </span>
+  );
+};
+
+const ClientLogo = ({ team, size = "h-10 w-10" }) =>
+  team.companyLogo ? (
+    <img src={team.companyLogo} alt="" className={`${size} shrink-0 rounded-xl bg-white object-cover ring-1 ring-slate-200/70`} />
+  ) : (
+    <span className={`flex ${size} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${colorFor(team.clientName || "")} text-xs font-black text-white`}>
+      {initials(team.clientName || "Client")}
+    </span>
+  );
+
+const LeagueTable = ({ teams, currentClientId }) => {
+  const [showAll, setShowAll] = useState(false);
+  if (teams.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-3xl bg-white shadow-lg shadow-red-900/5 ring-1 ring-slate-200/70">
+        <EmptyState icon={Trophy} title="No standings published yet" text="Shared client standings will appear here once they are published." compact />
+      </div>
+    );
+  }
+
+  const leaderPts = getPoints(teams[0]);
+  const ownIndex = teams.findIndex((t) => String(t.clientId) === String(currentClientId));
+  const maxPlayed = Math.max(1, ...teams.map((t) => t.played || 0));
+  const totalMatches = teams.reduce((s, t) => s + (t.played || 0), 0);
+
+  // Top N, plus your row if you're outside it
+  const rows = teams.map((t, i) => ({ t, i }));
+  const visible = showAll || teams.length <= TOP_N
+    ? rows
+    : [...rows.slice(0, TOP_N), ...(ownIndex >= TOP_N ? [{ gap: true }, rows[ownIndex]] : [])];
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-white shadow-lg shadow-red-900/5 ring-1 ring-slate-200/70">
+      {/* summary strip */}
+      <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-red-50/80 via-white to-rose-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <ClientLogo team={teams[0]} />
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-600">Leader</p>
+            <p className="truncate text-sm font-extrabold text-slate-900">{teams[0].clientName || "Client"} <span className="font-semibold text-slate-400">· {leaderPts} pts</span></p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">{teams.length} clients</span>
+          <span className="rounded-full bg-white px-3 py-1 text-slate-600 ring-1 ring-slate-200">{totalMatches} match entries</span>
+          {ownIndex >= 0 && (
+            <span className="rounded-full bg-gradient-to-r from-red-600 to-rose-500 px-3 py-1 text-white shadow shadow-red-600/25">
+              You're #{ownIndex + 1}{ownIndex > 0 && ` · ${leaderPts - getPoints(teams[ownIndex])} pts off top`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- DESKTOP TABLE ---------- */}
+      <div className="hidden md:block">
+        <table className="w-full table-auto border-collapse text-left">
+          <thead>
+            <tr className="bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <th scope="col" className="w-px whitespace-nowrap py-3 pl-6 pr-3 text-center">#</th>
+              <th scope="col" className="px-3 py-3">Client</th>
+              <th scope="col" className="px-3 py-3 text-center" title="Played">P</th>
+              <th scope="col" className="px-3 py-3 text-center text-emerald-600" title="Won">W</th>
+              <th scope="col" className="px-3 py-3 text-center text-red-500" title="Lost">L</th>
+              <th scope="col" className="w-44 px-3 py-3">Win rate</th>
+              <th scope="col" className="px-3 py-3 text-center">Gap</th>
+              <th scope="col" className="w-px whitespace-nowrap py-3 pl-3 pr-6 text-right">Pts</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {visible.map((row, k) => {
+              if (row.gap) {
+                return (
+                  <tr key={`gap-${k}`}>
+                    <td colSpan={8} className="py-1.5 text-center text-xs font-bold tracking-[0.3em] text-slate-300">• • •</td>
+                  </tr>
+                );
+              }
+              const { t, i } = row;
+              const own = String(t.clientId) === String(currentClientId);
+              const rate = winRateOf(t);
+              const gap = leaderPts - getPoints(t);
+              return (
+                <motion.tr
+                  key={t.clientId}
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(k, 12) * 0.03 }}
+                  className={`group relative transition-colors ${own ? "bg-red-50/70" : i === 0 ? "bg-amber-50/40 hover:bg-amber-50/70" : "hover:bg-slate-50/70"}`}
+                >
+                  <td className="relative w-px whitespace-nowrap py-3.5 pl-6 pr-3 text-center">
+                    {own && <span className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-gradient-to-b from-red-600 to-rose-500" />}
+                    <RankBadge index={i} own={own} />
+                  </td>
+                  <th scope="row" className="max-w-0 px-3 py-3.5 font-normal">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ClientLogo team={t} />
+                      <div className="min-w-0">
+                        <p className={`flex items-center gap-2 truncate text-sm font-bold ${own ? "text-red-700" : "text-slate-800 group-hover:text-red-600"}`}>
+                          <span className="truncate">{t.clientName || "Client"}</span>
+                          {own && <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">You</span>}
+                        </p>
+                        {MEDALS[i] && <p className={`text-[11px] font-bold ${MEDALS[i].text}`}>{MEDALS[i].label} place</p>}
+                      </div>
+                    </div>
+                  </th>
+                  <td className="px-3 py-3.5 text-center">
+                    <span className="text-sm font-semibold tabular-nums text-slate-700">{t.played || 0}</span>
+                    <div className="mx-auto mt-1 h-1 w-8 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-slate-300" style={{ width: `${((t.played || 0) / maxPlayed) * 100}%` }} />
+                    </div>
+                  </td>
+                  <td className="px-3 py-3.5 text-center">
+                    <span className="inline-flex min-w-8 justify-center rounded-lg bg-emerald-50 px-2 py-1 text-sm font-bold tabular-nums text-emerald-700">{t.won || 0}</span>
+                  </td>
+                  <td className="px-3 py-3.5 text-center">
+                    <span className="inline-flex min-w-8 justify-center rounded-lg bg-red-50 px-2 py-1 text-sm font-semibold tabular-nums text-red-500">{t.lost || 0}</span>
+                  </td>
+                  <td className="w-44 px-3 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${rate}%` }} transition={{ duration: 0.8, delay: Math.min(k, 12) * 0.04 }}
+                          className={`h-full rounded-full ${rate >= 60 ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : rate >= 40 ? "bg-gradient-to-r from-amber-300 to-amber-500" : "bg-gradient-to-r from-rose-300 to-red-500"}`} />
+                      </div>
+                      <span className="w-9 text-right text-xs font-bold tabular-nums text-slate-600">{rate}%</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3.5 text-center text-xs font-semibold tabular-nums text-slate-400">
+                    {i === 0 ? <span className="text-amber-600">—</span> : gap === 0 ? "Level" : `−${gap}`}
+                  </td>
+                  <td className="w-px whitespace-nowrap py-3.5 pl-3 pr-6 text-right">
+                    <span className={`inline-flex min-w-[3rem] justify-center rounded-xl px-3 py-1.5 text-sm font-black tabular-nums shadow-sm ${
+                      i === 0 ? "bg-gradient-to-br from-amber-400 to-amber-500 text-white" : own ? "bg-gradient-to-r from-red-600 to-rose-500 text-white" : "bg-slate-900/5 text-slate-900"
+                    }`}>
+                      {getPoints(t)}
+                    </span>
+                  </td>
+                </motion.tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ---------- MOBILE CARDS ---------- */}
+      <div className="space-y-2 p-3 md:hidden">
+        {visible.map((row, k) => {
+          if (row.gap) return <p key={`gap-${k}`} className="py-1 text-center text-xs font-bold tracking-[0.3em] text-slate-300">• • •</p>;
+          const { t, i } = row;
+          const own = String(t.clientId) === String(currentClientId);
+          const rate = winRateOf(t);
+          return (
+            <motion.div key={t.clientId} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(k, 12) * 0.03 }}
+              className={`relative overflow-hidden rounded-2xl p-3 ring-1 ${own ? "bg-red-50/70 ring-red-200" : i === 0 ? "bg-amber-50/50 ring-amber-100" : "bg-white ring-slate-100"}`}>
+              {own && <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-red-600 to-rose-500" />}
+              <div className="flex items-center gap-3">
+                <RankBadge index={i} own={own} />
+                <ClientLogo team={t} size="h-9 w-9" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 truncate text-sm font-bold text-slate-900">
+                    <span className="truncate">{t.clientName || "Client"}</span>
+                    {own && <span className="shrink-0 rounded-full bg-red-600 px-1.5 py-px text-[9px] font-extrabold uppercase text-white">You</span>}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-400">
+                    P {t.played || 0} · <span className="text-emerald-600">W {t.won || 0}</span> · <span className="text-red-500">L {t.lost || 0}</span>
+                  </p>
+                </div>
+                <span className={`rounded-xl px-2.5 py-1 text-sm font-black tabular-nums ${i === 0 ? "bg-amber-400 text-white" : own ? "bg-red-600 text-white" : "bg-slate-100 text-slate-900"}`}>{getPoints(t)}</span>
+              </div>
+              <div className="mt-2 flex items-center gap-2 pl-12">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <div className={`h-full rounded-full ${rate >= 60 ? "bg-emerald-500" : rate >= 40 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${rate}%` }} />
+                </div>
+                <span className="text-[11px] font-bold tabular-nums text-slate-500">{rate}%</span>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* footer */}
+      <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+        <span>2 points per win · ties split by most wins, then fewest losses</span>
+        {teams.length > TOP_N && (
+          <button onClick={() => setShowAll((v) => !v)} className="self-start rounded-lg px-2.5 py-1 text-xs font-bold text-red-600 transition hover:bg-red-50 sm:self-auto">
+            {showAll ? `Show top ${TOP_N}` : `Show all ${teams.length}`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 /* ================= EMPLOYEES ================= */
 const Avatar = ({ emp, size = "w-14 h-14", text = "text-base", rounded = "rounded-2xl" }) =>
