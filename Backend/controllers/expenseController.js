@@ -3,6 +3,7 @@ import Employee from "../models/Employee.js";
 import Department from "../models/Department.js";
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
+import { sendExpenseStatusEmail } from "../services/emailService.js";
 import uploadToImageKit from "../utils/uploadToImageKit.js";
 import { asyncHandler, badRequest, conflict, forbidden, notFound, ApiError } from "../middleware/errorHandler.js";
 import { getEmployeeForUser } from "../services/employeeScope.js";
@@ -159,30 +160,40 @@ export const reviewExpenseClaim = asyncHandler(async (req, res) => {
   if (claim.status === "Reimbursed") {
     throw conflict("Cannot modify a claim that has already been reimbursed in payroll", "ALREADY_REIMBURSED");
   }
+  if (claim.status !== "Pending") {
+    throw conflict("Expense claim has already been reviewed", "ALREADY_REVIEWED", { status: claim.status });
+  }
 
   const targetEmp = await Employee.findById(claim.employeeId).select("userId").lean();
   if (targetEmp?.userId?.toString() === req.user._id.toString()) {
     throw forbidden("You cannot review your own expense claims");
   }
 
-  claim.status = decision;
-  claim.reviewedBy = req.user._id;
-  claim.reviewedAt = new Date();
-  claim.reviewRemarks = remarks;
-  await claim.save();
-
-  // Notify employee
-  const emp = await Employee.findById(claim.employeeId).select("userId").lean();
-  if (emp?.userId) {
-    await Notification.create({
-      type: "expense-status",
-      message: `Your ₹${claim.amount} expense claim (${claim.title}) was ${decision.toLowerCase()}.${remarks ? ` Remarks: ${remarks}` : ""}`,
-      seen: false,
-      data: { userId: emp.userId, claimId: claim._id, status: decision },
-    });
+  const reviewedClaim = await ExpenseClaim.findOneAndUpdate(
+    { _id: claimId, status: "Pending" },
+    { $set: { status: decision, reviewedBy: req.user._id, reviewedAt: new Date(), reviewRemarks: remarks } },
+    { returnDocument: "after" }
+  );
+  if (!reviewedClaim) {
+    const latest = await ExpenseClaim.findById(claimId).select("status").lean();
+    throw conflict("Expense claim has already been reviewed", "ALREADY_REVIEWED", { status: latest?.status });
   }
 
-  return res.json({ success: true, claim });
+  // Notify employee
+  const employeeUser = targetEmp?.userId
+    ? await User.findById(targetEmp.userId).select("name email").lean()
+    : null;
+  if (employeeUser) {
+    await Notification.create({
+      type: "expense-status",
+      message: `Your ₹${reviewedClaim.amount} expense claim (${reviewedClaim.title}) was ${decision.toLowerCase()}.${remarks ? ` Remarks: ${remarks}` : ""}`,
+      seen: false,
+      data: { userId: employeeUser._id, claimId: reviewedClaim._id, status: decision },
+    });
+    await sendExpenseStatusEmail(employeeUser, reviewedClaim, decision, remarks);
+  }
+
+  return res.json({ success: true, claim: reviewedClaim });
 });
 
 /* ================= EMPLOYEE / ADMIN: DELETE (WITHDRAW) EXPENSE CLAIM ================= */

@@ -36,6 +36,8 @@ export function NotificationsScreen() {
       router.push(leaveId ? `/employee/leave-detail/${leaveId}` : '/employee/leave');
     } else if (n.type === 'attendance-request-status') {
       router.navigate('/employee/attendance');
+    } else if (n.type === 'expense-status') {
+      router.navigate('/employee/expenses');
     }
   };
 
@@ -51,7 +53,7 @@ export function NotificationsScreen() {
   return (
     <Screen scroll={false} padded={false}>
       <Stack.Screen options={{ title: 'Notifications' }} />
-      <QueryStateView query={q} isEmpty={(d) => d.pages.every((p) => p.notifications.length === 0)} emptyTitle="No notifications" emptyMessage="Leave and attendance updates appear here.">
+      <QueryStateView query={q} isEmpty={(d) => d.pages.every((p) => p.notifications.length === 0)} emptyTitle="No notifications" emptyMessage="Expense, leave and attendance updates appear here.">
         {(d) => (
           <FlatList
             data={d.pages.flatMap((p) => p.notifications)}

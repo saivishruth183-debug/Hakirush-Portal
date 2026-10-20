@@ -12,6 +12,7 @@ const transporter = nodemailer.createTransport({
 
 export const __testHooks = {
   capturePasswordResetEmail: null,
+  captureExpenseStatusEmail: null,
 };
 
 export const sendPasswordResetOtpEmail = async (user, otp) => {
@@ -183,6 +184,44 @@ export const sendLeaveStatusEmail = async (employeeUser, leave, status, managerN
   };
 
   await transporter.sendMail(mailOptions).catch(console.error);
+};
+
+export const sendExpenseStatusEmail = async (employeeUser, claim, status, remarks = "") => {
+  if (process.env.NODE_ENV === "test" && __testHooks.captureExpenseStatusEmail) {
+    await __testHooks.captureExpenseStatusEmail({ employeeUser, claim, status, remarks });
+    return;
+  }
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn("WARNING: EMAIL_USER or EMAIL_PASS not configured. Skipping expense status email.");
+    return;
+  }
+
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+  const color = status === "Approved" ? "#2E7D32" : "#C62828";
+  const mailOptions = {
+    from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
+    to: employeeUser.email,
+    subject: `Expense Claim ${status}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+        <h2 style="color: ${color}; text-align: center;">Expense Claim ${status}</h2>
+        <p>Hello ${escapeHtml(employeeUser.name)},</p>
+        <p>Your expense claim <strong>${escapeHtml(claim.title)}</strong> for ₹${escapeHtml(claim.amount)} has been <strong>${escapeHtml(status)}</strong>.</p>
+        ${remarks ? `<p><strong>Reviewer remarks:</strong> ${escapeHtml(remarks)}</p>` : ""}
+      </div>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions).catch((err) =>
+    console.error("Expense status email failed:", err.message)
+  );
 };
 
 export const sendAssetAssignmentEmail = async (employeeUser, employee, asset) => {

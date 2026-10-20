@@ -5,6 +5,7 @@ import {
   Megaphone, Cake, Award, Clock, Send, CheckCircle2, XCircle, Clock3,
   Users, UserPlus, RefreshCw, MapPin, Loader2, Sun, Sunrise, Moon, PartyPopper,
   CalendarCheck2, TrendingUp, FileClock, Trash2, AlertTriangle, Timer, Sparkles,
+  Receipt,
 } from "lucide-react";
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -14,7 +15,7 @@ import { useAuth } from "../../context/authContext";
 import EmployeePunch from "../attendance/EmployeePunch";
 import { apiErrorMessage } from "../../utils/apiError";
 
-const NOTICE_TYPES = ["leave-status", "attendance-request-status"];
+const NOTICE_TYPES = ["leave-status", "attendance-request-status", "expense-status"];
 
 /* ================= DESIGN TOKENS ================= */
 const PAGE_BG =
@@ -548,6 +549,11 @@ const EmployeeSummary = () => {
       });
       setRequestForm({ requestedStatus: "Present", reason: "" });
       document.getElementById("attendance-calendar-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    if (notification.type === "expense-status") {
+      window.location.href = "/employee-dashboard/expenses";
     }
   };
 
@@ -785,12 +791,12 @@ const EmployeeSummary = () => {
                     <div className="max-h-[360px] space-y-1 overflow-y-auto p-3">
                       {notifications.length > 0 && (
                         <>
-                          <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">Leave & attendance updates</p>
+                          <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">Expense, leave & attendance updates</p>
                           {notifications.map((n) => (
                             <button key={n._id} onClick={() => handleNotificationClick(n)}
                               className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition ${n.seen ? "opacity-60 hover:bg-gray-50" : "bg-red-50/70 hover:bg-red-50"}`}>
-                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${n.type === "leave-status" ? "bg-violet-100 text-violet-600" : "bg-sky-100 text-sky-600"}`}>
-                                {n.type === "leave-status" ? <Umbrella size={15} /> : <CalendarCheck2 size={15} />}
+                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${n.type === "leave-status" ? "bg-violet-100 text-violet-600" : n.type === "expense-status" ? "bg-amber-100 text-amber-600" : "bg-sky-100 text-sky-600"}`}>
+                                {n.type === "leave-status" ? <Umbrella size={15} /> : n.type === "expense-status" ? <Receipt size={15} /> : <CalendarCheck2 size={15} />}
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block text-sm font-semibold text-gray-800">{n.message}</span>
