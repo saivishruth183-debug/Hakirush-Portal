@@ -30,6 +30,8 @@ import {
   Fingerprint,
   LayoutGrid,
   List,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const fallbackImage = Cricket;
@@ -46,8 +48,6 @@ const getStatusBadgeClass = (status) => {
 };
 
 const getPoints = (t) => (t.won || 0) * 2;
-const getWinRate = (t) => (t.played ? Math.round(((t.won || 0) / t.played) * 100) : 0);
-
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
   show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.4, ease: "easeOut" } }),
@@ -88,6 +88,7 @@ const ClientSportsPlan = () => {
   const [zoomImage, setZoomImage] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [activeEmployee, setActiveEmployee] = useState(null);
+  const [copiedId, setCopiedId] = useState(false); // UI-only
 
   useEffect(() => {
     if (!user?._id) return;
@@ -190,101 +191,130 @@ const ClientSportsPlan = () => {
   const orgName = client?.userId?.name;
   const plan = client.planType;
 
+  /* UI-only derived */
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const aboveTeam = ownRank > 0 ? sortedSharedTeams[ownRank - 1] : null;
+  const gap = aboveTeam ? getPoints(aboveTeam) - stats.points : 0;
+  const rankNote = ownRank === 0 ? "Top of the table 🏆" : aboveTeam ? (gap > 0 ? `${gap} pts behind #${ownRank}` : `Level with #${ownRank}`) : "";
+  const copyClientId = async () => {
+    try {
+      await navigator.clipboard.writeText(String(client.clientId || client._id));
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } catch { /* ignore */ }
+  };
+
   return (
     <div className="min-h-screen lg:h-screen bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] text-slate-900 font-sans lg:overflow-hidden selection:bg-red-200/60">
       <div className="flex flex-col lg:flex-row lg:h-full">
         {/* ================= MAIN ================= */}
         <main className="flex-1 lg:overflow-y-auto">
-          {/* HERO */}
-          <section className="relative overflow-hidden bg-slate-950 text-white">
-            <img src={fallbackImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-red-950/70" />
-            <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-red-600/30 blur-3xl" />
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 pt-6 md:pt-8 pb-16 space-y-10 relative">
+            {/* HERO */}
+            <motion.section
+              initial="hidden" animate="show" variants={fadeUp}
+              className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 text-white shadow-2xl shadow-red-600/30"
+            >
+              <img src={fallbackImage} alt="" className="pointer-events-none absolute -right-10 bottom-0 h-[115%] w-auto object-contain opacity-[0.12] mix-blend-luminosity" />
+              <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/15 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-24 left-1/4 h-60 w-60 rounded-full bg-orange-300/25 blur-3xl" />
+              <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
 
-            <div className="relative max-w-6xl mx-auto px-6 md:px-10 py-10 md:py-14">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <motion.div initial="hidden" animate="show" variants={fadeUp}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                    </span>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Live dashboard</span>
+              <div className="relative p-6 sm:p-8 md:p-10">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-white text-2xl font-black text-red-600 shadow-xl ring-4 ring-white/30 sm:h-24 sm:w-24">
+                      {client.companyLogo ? (
+                        <img src={client.companyLogo} alt={`${orgName || "Client"} logo`} className="h-full w-full object-cover" />
+                      ) : (
+                        initials(orgName || "Client")
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                        </span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/85">Live dashboard</span>
+                      </div>
+                      <p className="text-sm font-semibold text-white/80">{greeting},</p>
+                      <h1 className="break-words text-3xl font-black leading-tight tracking-tight md:text-5xl">{orgName}</h1>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {plan && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-extrabold text-red-600 shadow">
+                            <Crown size={13} /> {plan} plan
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={copyClientId}
+                          title="Copy Client ID"
+                          className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/25 transition hover:bg-white/25"
+                        >
+                          <Fingerprint size={13} className="shrink-0" />
+                          <span className="shrink-0">Client ID</span>
+                          <span className="truncate font-mono">{client.clientId || client._id}</span>
+                          {copiedId ? <Check size={13} className="shrink-0" /> : <Copy size={12} className="shrink-0 opacity-70" />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Welcome back</p>
-                  <h1 className="mt-1 text-3xl md:text-5xl font-black tracking-tight">{orgName}</h1>
-                  <p className="mt-3 text-sm text-slate-300 max-w-md">
-                    Track your squads, your people, tournament moments and every update.
-                  </p>
-                  <p className="mt-3 inline-flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-slate-300">
-                    <Fingerprint size={13} className="shrink-0 text-red-300" />
-                    <span className="shrink-0 font-semibold">Client ID</span>
-                    <span className="truncate font-mono" title={client.clientId || client._id}>{client.clientId || client._id}</span>
-                  </p>
-                </motion.div>
 
-                <motion.div initial="hidden" animate="show" custom={1} variants={fadeUp} className="flex flex-wrap gap-3 self-start md:self-auto">
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-5 py-4">
-                    <div className="p-2.5 rounded-xl bg-white/10">
-                      <Users size={20} />
+                  {/* rank badge */}
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex min-w-[10rem] items-center gap-3 rounded-2xl bg-white/15 px-5 py-4 ring-1 ring-white/25 backdrop-blur">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-red-600 shadow">
+                        <Crown size={20} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/75">Company rank</p>
+                        <p className="text-2xl font-black leading-none">
+                          {ownRank >= 0 ? <>#{ownRank + 1}<span className="text-sm font-bold text-white/70"> / {sortedSharedTeams.length}</span></> : "—"}
+                        </p>
+                        {rankNote && <p className="mt-1 text-[11px] font-semibold text-white/85">{rankNote}</p>}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Roster Players</p>
-                      <p className="text-lg font-extrabold">{employees.length}</p>
+                    <div className="flex items-center gap-3 rounded-2xl bg-white/15 px-5 py-4 ring-1 ring-white/25 backdrop-blur">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
+                        <Users size={20} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/75">Roster players</p>
+                        <p className="text-2xl font-black leading-none">{employees.length}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md px-5 py-4">
-                    <div className="p-2.5 rounded-xl bg-red-600 shadow-lg shadow-red-600/40">
-                      <ShieldCheck size={20} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Plan</p>
-                      <p className="text-lg font-extrabold">{plan}</p>
-                    </div>
-                  </div>
-                </motion.div>
+                </div>
               </div>
-            </div>
-          </section>
-
-          <div className="max-w-6xl mx-auto px-6 md:px-10 -mt-8 pb-16 space-y-10 relative">
-            {/* KPI CARDS */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard i={0} icon={Medal} label="Points" value={stats.points} tone="slate" />
-              <StatCard i={1} icon={Activity} label="Matches Played" value={stats.played} tone="blue" />
-              <StatCard i={2} icon={Trophy} label="Matches Won" value={stats.won} tone="emerald" />
-              <StatCard i={3} icon={Target} label="Win Rate" value={`${stats.winRate}%`} tone="red" progress={stats.winRate} />
-            </div>
+            </motion.section>
 
             {/* PERFORMANCE */}
             <section className="space-y-6">
               <SectionTitle icon={BarChart3} eyebrow="Your live standings" title="Your" accent="Performance" />
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-                <StatCard i={0} icon={Activity} label="Played" value={stats.played} tone="slate" />
-                <StatCard i={1} icon={Trophy} label="Won" value={stats.won} tone="emerald" />
-                <StatCard i={2} icon={X} label="Lost" value={stats.lost} tone="red" />
-                <StatCard i={3} icon={Target} label="Win Rate" value={`${stats.winRate}%`} tone="blue" progress={stats.winRate} />
-                <StatCard i={4} icon={Medal} label="Points" value={stats.points} tone="slate" />
-                <StatCard
-                  i={5}
-                  icon={Crown}
-                  label="Company Rank"
-                  value={ownRank >= 0 ? `Rank ${ownRank + 1} of ${sortedSharedTeams.length}` : "—"}
-                  tone="red"
-                />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {/* win-rate ring */}
+                <motion.div initial="hidden" animate="show" custom={0} variants={fadeUp}
+                  className="flex items-center gap-5 rounded-3xl bg-white p-5 shadow-lg shadow-red-900/5 ring-1 ring-slate-200/70">
+                  <WinRing value={stats.winRate} />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Win rate</p>
+                    <p className="text-3xl font-black tracking-tight text-slate-900">{stats.winRate}%</p>
+                    <p className="text-xs text-slate-500">{stats.won} won of {stats.played} played</p>
+                    <div className="mt-2 flex h-2 w-40 max-w-full overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full bg-emerald-500" style={{ width: `${stats.played ? (stats.won / stats.played) * 100 : 0}%` }} />
+                      <div className="h-full bg-red-400" style={{ width: `${stats.played ? (stats.lost / stats.played) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                </motion.div>
+                <div className="grid grid-cols-2 gap-4 lg:col-span-2 md:grid-cols-4">
+                  <StatCard i={1} icon={Medal} label="Points" value={stats.points} tone="red" />
+                  <StatCard i={2} icon={Activity} label="Played" value={stats.played} tone="blue" />
+                  <StatCard i={3} icon={Trophy} label="Won" value={stats.won} tone="emerald" />
+                  <StatCard i={4} icon={X} label="Lost" value={stats.lost} tone="rose" />
+                </div>
               </div>
-            </section>
-
-            <section className="space-y-6">
-              <SectionTitle icon={BarChart3} eyebrow="Shared standings" title="Company" accent="Performance" />
-              {sortedSharedTeams.length > 0 ? (
-                <>
-                  {sortedSharedTeams.length >= 3 && <Podium teams={sortedSharedTeams.slice(0, 3)} />}
-                  <StandingsTable teams={sortedSharedTeams} currentClientId={client?._id} />
-                </>
-              ) : (
-                <EmptyState icon={BarChart3} title="No shared standings yet" text="Company-wide performance data will appear here once published." />
-              )}
             </section>
 
             {/* EMPLOYEES */}
@@ -308,7 +338,9 @@ const ClientSportsPlan = () => {
               <div className="relative p-2.5 bg-red-600 rounded-xl shadow-md shadow-red-600/30">
                 <Bell size={16} className="text-white" />
                 {announcements.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-white" />
+                  <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-extrabold text-amber-950 ring-2 ring-white">
+                    {announcements.length > 99 ? "99+" : announcements.length}
+                  </span>
                 )}
               </div>
               <div>
@@ -459,7 +491,7 @@ const ClientSportsPlan = () => {
 
 /* ================= SMALL PIECES ================= */
 const LoadingScreen = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+  <div className="min-h-screen flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)]">
     <div className="relative flex items-center justify-center">
       <div className="w-16 h-16 border-4 border-slate-200 border-t-red-600 rounded-full animate-spin" />
       <img src={fallbackImage} alt="" className="absolute w-8 h-8 object-contain opacity-70" />
@@ -469,7 +501,7 @@ const LoadingScreen = () => (
 );
 
 const AccessPending = () => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+  <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] p-6">
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
       className="text-center p-12 bg-white rounded-[2rem] shadow-xl shadow-slate-200/60 border border-slate-100 max-w-sm w-full"
@@ -485,8 +517,8 @@ const AccessPending = () => (
 
 const SectionTitle = ({ icon: Icon, eyebrow, title, accent }) => (
   <div className="flex items-center gap-4">
-    <div className="p-3 rounded-2xl bg-white border border-slate-200/70 shadow-sm">
-      <Icon size={20} className="text-red-600" />
+    <div className="p-3 rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 shadow-lg shadow-red-600/30">
+      <Icon size={20} className="text-white" />
     </div>
     <div>
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{eyebrow}</p>
@@ -501,13 +533,14 @@ const toneMap = {
   slate: "bg-slate-900 text-white shadow-slate-900/20",
   blue: "bg-sky-500 text-white shadow-sky-500/30",
   emerald: "bg-emerald-500 text-white shadow-emerald-500/30",
-  red: "bg-red-600 text-white shadow-red-600/30",
+  red: "bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-red-600/30",
+  rose: "bg-rose-400 text-white shadow-rose-400/30",
 };
 
 const StatCard = ({ icon: Icon, label, value, tone, progress, i }) => (
   <motion.div
     initial="hidden" animate="show" custom={i} variants={fadeUp}
-    className="bg-white rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/40 p-5"
+    className="bg-white rounded-3xl ring-1 ring-slate-200/70 shadow-lg shadow-red-900/5 p-5 transition hover:-translate-y-0.5"
   >
     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${toneMap[tone]}`}>
       <Icon size={18} />
@@ -524,6 +557,29 @@ const StatCard = ({ icon: Icon, label, value, tone, progress, i }) => (
     )}
   </motion.div>
 );
+
+const WinRing = ({ value = 0 }) => {
+  const R = 34, C = 2 * Math.PI * R;
+  return (
+    <div className="relative h-24 w-24 shrink-0">
+      <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+        <defs>
+          <linearGradient id="winring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#dc2626" />
+            <stop offset="100%" stopColor="#f43f5e" />
+          </linearGradient>
+        </defs>
+        <circle cx="40" cy="40" r={R} fill="none" stroke="#f1f5f9" strokeWidth="9" />
+        <motion.circle cx="40" cy="40" r={R} fill="none" stroke="url(#winring)" strokeWidth="9" strokeLinecap="round"
+          strokeDasharray={C} initial={{ strokeDashoffset: C }} animate={{ strokeDashoffset: C * (1 - Math.min(100, value) / 100) }}
+          transition={{ duration: 0.9, ease: "easeOut" }} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Target size={22} className="text-red-500" />
+      </div>
+    </div>
+  );
+};
 
 const InfoPill = ({ icon: Icon, label, value }) => (
   <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
@@ -588,7 +644,7 @@ const EmployeeSection = ({ employees, onSelect }) => {
   const shown = filtered.slice(0, visible);
 
   return (
-    <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden">
+    <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-red-900/5 overflow-hidden">
       {/* Toolbar */}
       <div className="p-4 md:p-5 border-b border-slate-100 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
@@ -668,7 +724,7 @@ const EmployeeSection = ({ employees, onSelect }) => {
                         {e.joined ? new Date(e.joined).toLocaleDateString() : "Recently added"}
                       </span>
                       <div className="flex gap-1.5">
-                        <span className="px-2 py-1 rounded-md bg-slate-900 text-white text-[10px] font-black">
+                        <span className="px-2 py-1 rounded-md bg-red-600 text-white text-[10px] font-black">
                           {e.jerseySize}
                         </span>
                       </div>
@@ -761,137 +817,13 @@ const EmployeeModal = ({ employee: e, onClose, onZoom }) => (
   </AnimatePresence>
 );
 
-/* ================= PODIUM ================= */
-const podiumStyles = [
-  { ring: "from-amber-300 to-amber-500", height: "h-32", label: "1st", icon: Crown, text: "text-amber-600" },
-  { ring: "from-slate-300 to-slate-400", height: "h-24", label: "2nd", icon: Medal, text: "text-slate-500" },
-  { ring: "from-orange-300 to-amber-700", height: "h-20", label: "3rd", icon: Medal, text: "text-amber-700" },
-];
-
-const Podium = ({ teams }) => {
-  // Display order: 2nd, 1st, 3rd
-  const order = [1, 0, 2].filter((i) => teams[i]);
-  return (
-    <div className="grid grid-cols-3 gap-3 md:gap-5 items-end">
-      {order.map((rank, pos) => {
-        const t = teams[rank];
-        const s = podiumStyles[rank];
-        const Icon = s.icon;
-        return (
-          <motion.div
-            key={`${t.clientId}-${rank}`}
-            initial="hidden" animate="show" custom={pos} variants={fadeUp}
-            className="flex flex-col items-center"
-          >
-            <div className={`p-[3px] rounded-2xl bg-gradient-to-br ${s.ring} shadow-lg mb-3`}>
-              <div className="w-12 h-12 md:w-14 md:h-14 rounded-[13px] bg-white flex items-center justify-center">
-                <Icon size={22} className={s.text} />
-              </div>
-            </div>
-            <p className="text-sm md:text-base font-bold text-slate-900 text-center line-clamp-1 px-1">{t.clientName || "Unknown client"}</p>
-            <p className="text-[11px] font-semibold text-slate-400 mb-3">
-              {t.won} wins · {getPoints(t)} pts
-            </p>
-            <div
-              className={`w-full ${s.height} rounded-t-2xl bg-gradient-to-b ${
-                rank === 0 ? "from-red-600 to-red-700" : "from-slate-800 to-slate-900"
-              } flex items-start justify-center pt-3 shadow-xl`}
-            >
-              <span className="text-white/90 text-lg md:text-2xl font-black">{s.label}</span>
-            </div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-};
-
-/* ================= STANDINGS TABLE ================= */
-const rankBadge = (i) => {
-  if (i === 0) return "bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-md shadow-amber-500/30";
-  if (i === 1) return "bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-md shadow-slate-400/30";
-  if (i === 2) return "bg-gradient-to-br from-orange-300 to-amber-700 text-white shadow-md shadow-amber-700/30";
-  return "bg-slate-100 text-slate-500";
-};
-
-const StandingsTable = ({ teams, currentClientId }) => (
-  <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden">
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left">
-        <thead>
-          <tr className="bg-slate-50/80 border-b border-slate-200/70">
-            <th className="py-4 pl-6 pr-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-16">#</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Client</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">P</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-emerald-600 uppercase tracking-wider text-center">W</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-red-500 uppercase tracking-wider text-center">L</th>
-            <th className="py-4 px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider w-40">Win rate</th>
-            <th className="py-4 pr-6 pl-3 text-[10px] font-bold text-slate-900 uppercase tracking-wider text-right">Pts</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {teams.map((team, idx) => {
-            const rate = getWinRate(team);
-            const isOwn = String(team.clientId) === String(currentClientId);
-            return (
-              <motion.tr
-                key={team.clientId || idx}
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.04 }}
-                className={`group transition-colors hover:bg-red-50/40 ${
-                  isOwn ? "bg-red-50/40 ring-2 ring-inset ring-red-500" : idx === 0 ? "bg-amber-50/30" : ""
-                }`}
-              >
-                <td className="py-4 pl-6 pr-3">
-                  <span className={`w-7 h-7 flex items-center justify-center text-xs font-bold rounded-lg ${rankBadge(idx)}`}>
-                    {idx + 1}
-                  </span>
-                </td>
-                <td className="py-4 px-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xs font-bold">
-                      {(team.clientName || "?").slice(0, 2).toUpperCase()}
-                    </div>
-                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-800 group-hover:text-red-600 transition-colors">
-                      {team.clientName || "Unknown client"}
-                      {isOwn && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-red-700">You</span>}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-4 px-3 text-center text-sm font-medium text-slate-500">{team.played}</td>
-                <td className="py-4 px-3 text-center text-sm font-bold text-emerald-600">{team.won}</td>
-                <td className="py-4 px-3 text-center text-sm font-medium text-red-400">{team.lost}</td>
-                <td className="py-4 px-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }} animate={{ width: `${rate}%` }} transition={{ duration: 0.8, delay: idx * 0.05 }}
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
-                      />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-500 w-9 text-right">{rate}%</span>
-                  </div>
-                </td>
-                <td className="py-4 pr-6 pl-3 text-right">
-                  <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold">
-                    {getPoints(team)}
-                  </span>
-                </td>
-              </motion.tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
 /* ================= MEDIA HUB ================= */
 const MediaHub = ({ galleries, onZoom }) => {
   const [active, setActive] = useState(galleries[0].id);
   const current = galleries.find((g) => g.id === active) || galleries[0];
 
   return (
-    <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden">
+    <div className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-red-900/5 overflow-hidden">
       <div className="flex gap-1 p-2 m-4 mb-0 bg-slate-100 rounded-2xl overflow-x-auto">
         {galleries.map((g) => (
           <button

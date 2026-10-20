@@ -44,32 +44,6 @@ export const createExpenseClaim = asyncHandler(async (req, res) => {
     throw badRequest("Receipt or bill photo is required");
   }
 
-  const isManager = Boolean(await Department.exists({ managerEmployeeId: employee._id }));
-
-  // Department managers are directly approved
-  if (isManager || req.user.role === "admin") {
-    const claim = await ExpenseClaim.create({
-      employeeId: employee._id,
-      title,
-      category,
-      amount,
-      date,
-      description,
-      receiptUrl,
-      status: "Approved",
-      reviewedBy: req.user._id,
-      reviewedAt: new Date(),
-      reviewRemarks: "Auto-approved for Department Manager",
-    });
-
-    return res.status(201).json({
-      success: true,
-      claim,
-      autoApproved: true,
-      message: "Expense claim approved directly without admin review",
-    });
-  }
-
   const claim = await ExpenseClaim.create({
     employeeId: employee._id,
     title,
@@ -91,7 +65,7 @@ export const createExpenseClaim = asyncHandler(async (req, res) => {
         claimId: claim._id,
         employeeId: employee._id,
         adminId: admin._id,
-        link: "/admin-dashboard",
+        link: "/admin-dashboard/expenses",
       },
     }));
     await Notification.insertMany(notifications);
@@ -170,8 +144,12 @@ export const getAllExpenseClaims = asyncHandler(async (req, res) => {
   return res.json({ success: true, claims });
 });
 
-/* ================= ADMIN / MANAGER: REVIEW EXPENSE CLAIM ================= */
+/* ================= ADMIN: REVIEW EXPENSE CLAIM ================= */
 export const reviewExpenseClaim = asyncHandler(async (req, res) => {
+  if (req.user.role !== "admin") {
+    throw forbidden("Only admins can review expense claims");
+  }
+
   const claimId = requireObjectId(req.params.id, "id");
   const decision = requireEnum(req.body?.decision, ["Approved", "Rejected"], "decision");
   const remarks = trimmedString(req.body?.remarks, "remarks", { max: 500, optional: true }) || "";
@@ -182,15 +160,9 @@ export const reviewExpenseClaim = asyncHandler(async (req, res) => {
     throw conflict("Cannot modify a claim that has already been reimbursed in payroll", "ALREADY_REIMBURSED");
   }
 
-  if (req.user.role !== "admin") {
-    const managerEmp = await Employee.findOne({ userId: req.user._id }).select("_id").lean();
-    const targetEmp = await Employee.findById(claim.employeeId).select("department").lean();
-    const managesDept = Boolean(
-      managerEmp &&
-        targetEmp &&
-        (await Department.exists({ _id: targetEmp.department, managerEmployeeId: managerEmp._id }))
-    );
-    if (!managesDept) throw forbidden("You can only review claims for your department members");
+  const targetEmp = await Employee.findById(claim.employeeId).select("userId").lean();
+  if (targetEmp?.userId?.toString() === req.user._id.toString()) {
+    throw forbidden("You cannot review your own expense claims");
   }
 
   claim.status = decision;

@@ -7,7 +7,7 @@ import {
   BriefcaseBusiness, Building, Users, Activity, UserMinus, Calendar, AlertCircle, Download,
   Cake, Bell, X, Clock, RefreshCw, CheckCheck, ArrowUpRight, ClipboardCheck, CalendarClock,
   Inbox, Sun, Moon, Sunrise, PieChart as PieIcon, Store, Handshake, Gift,
-  Lightbulb, TrendingUp, TrendingDown, Info,
+  Lightbulb, TrendingUp, TrendingDown, Info, Receipt,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -291,9 +291,10 @@ const AdminSummary = () => {
         await markSeen(n._id);
         setNotifications((l) => l.map((x) => (x._id === n._id ? { ...x, seen: true } : x)));
       }
-      const path = n?.data?.link || n?.link ||
-        (n?.type === "leave-request" ? "/admin-dashboard/leaves"
-          : n?.type === "attendance-request" ? "/admin-dashboard/attendance-requests" : null);
+      const path = n?.type === "expense-claim" ? "/admin-dashboard/expenses"
+        : n?.data?.link || n?.link ||
+          (n?.type === "leave-request" ? "/admin-dashboard/leaves"
+            : n?.type === "attendance-request" ? "/admin-dashboard/attendance-requests" : null);
       if (path) { setShowNotif(false); navigate(path); }
     } catch {}
   };
@@ -508,7 +509,8 @@ const AdminSummary = () => {
                         shownNotifs.map((n) => {
                           const isLeave = n.type === "leave-request";
                           const isAtt = n.type === "attendance-request";
-                          const Icon = isLeave ? CalendarClock : isAtt ? ClipboardCheck : Bell;
+                          const isExpense = n.type === "expense-claim";
+                          const Icon = isLeave ? CalendarClock : isAtt ? ClipboardCheck : isExpense ? Receipt : Bell;
                           const color = isLeave ? C.amber : isAtt ? C.emerald : C.brand;
                           return (
                             <button

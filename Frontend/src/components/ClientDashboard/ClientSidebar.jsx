@@ -34,7 +34,7 @@ const ClientSidebar = () => {
   const sidebarLinks = [
     { link: "/client-dashboard", icon: LayoutDashboard, title: "Dashboard", group: "Partnership" },
     {
-      link: `/client-dashboard/ourrelationship/${user?._id}`,
+      link: `/client-dashboard/roster/${user?._id}`,
       icon: Shirt,
       title: "Roster",
       group: "Partnership",

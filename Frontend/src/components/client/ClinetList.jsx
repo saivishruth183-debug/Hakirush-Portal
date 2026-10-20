@@ -257,7 +257,7 @@ const ClientList = () => {
               to="/admin-dashboard/clients/content"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-0.5 hover:text-violet-700 hover:ring-violet-200 active:scale-95"
             >
-              <Images size={17} /> Gallery &amp; standings
+              <Images size={17} /> Gallery & Standings
             </Link>
             <Link
               to="/admin-dashboard/add-client"

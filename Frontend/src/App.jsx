@@ -62,7 +62,7 @@ const EmployeeOvertime = lazy(() => import("./components/attendance/EmployeeOver
 /* ================= CLIENT IMPORTS ================= */
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard"));
 const ClientSummary = lazy(() => import("./components/ClientDashboard/ClientSummary"));
-const ClientRelationship = lazy(() => import("./components/ClientDashboard/ClientRelationship"));
+const ClientRoster = lazy(() => import("./components/ClientDashboard/ClientRoster"));
 
 /* Lightweight branding fallback spinner */
 const PageLoader = () => (
@@ -180,7 +180,7 @@ const App = () => {
             }
           >
             <Route index element={<ClientSummary />} />
-            <Route path="ourrelationship/:id" element={<ClientRelationship />} />
+            <Route path="roster/:id" element={<ClientRoster />} />
             <Route path="setting" element={<EmployeeSetting />} />
           </Route>
 

@@ -9,15 +9,6 @@ import {
 } from "lucide-react";
 import { apiErrorMessage } from "../../utils/apiError";
 
-/* Admin-only management of client galleries and performance standings.
-   Endpoints (admin):
-   - GET       /api/client/:id/gallery/upload-auth (short-lived ImageKit upload credentials)
-   - GET/POST  /api/client/:id/gallery            (POST {fileId, caption})
-   - DELETE    /api/client/:id/gallery/:imageId
-   - GET/PUT  /api/client/:id/performance       (PUT {standings:[{teamName,played,won,lost,points}]})
-   - GET/PUT  /api/client/shared/performance     (PUT {standings:[{clientId,played,won,lost}]})
-   - GET       /api/client/admin/list           (admin client names for shared standings) */
-
 const BACKEND = (import.meta.env.VITE_BACKEND_URL || "").replace(/\/+$/, "");
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 

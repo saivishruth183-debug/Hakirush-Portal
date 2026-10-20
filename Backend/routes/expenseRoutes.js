@@ -22,7 +22,7 @@ router.post("/", authMiddleware, requireEmployee, upload.single("receipt"), crea
 router.get("/me", authMiddleware, requireEmployee, getMyExpenseClaims);
 router.get("/employee/:employeeId/approved", authMiddleware, requireAdmin, getApprovedReimbursementsForEmployee);
 router.get("/", authMiddleware, authorizeRoles("admin", "employee"), getAllExpenseClaims);
-router.put("/:id/review", authMiddleware, authorizeRoles("admin", "employee"), reviewExpenseClaim);
+router.put("/:id/review", authMiddleware, requireAdmin, reviewExpenseClaim);
 router.delete("/:id", authMiddleware, authorizeRoles("admin", "employee"), deleteExpenseClaim);
 
 export default router;

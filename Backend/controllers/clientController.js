@@ -110,7 +110,7 @@ const getSharedClientStandings = asyncHandler(async (req, res) => {
     .map((standing) => standing.clientId)
     .filter((clientId) => clientId && mongoose.isObjectIdOrHexString(clientId));
   const clients = clientIds.length
-    ? await Client.find({ _id: { $in: clientIds } }).populate("userId", "name").lean()
+    ? await Client.find({ _id: { $in: clientIds } }).populate("userId", "name").select("userId companyLogo").lean()
     : [];
   const clientsById = new Map(clients.map((client) => [String(client._id), client]));
   return res.json({
@@ -123,6 +123,7 @@ const getSharedClientStandings = asyncHandler(async (req, res) => {
       return {
         clientId,
         clientName: client?.userId?.name || standing.clientName || "",
+        ...(client?.companyLogo ? { companyLogo: client.companyLogo } : {}),
         played: standing.played ?? 0,
         won: standing.won ?? 0,
         lost: standing.lost ?? 0,

@@ -7,7 +7,7 @@ import {
   Copy, Check, Wallet, Clock, Crown, CalendarRange, Send, RefreshCw,
   SearchX, WifiOff, X, Sparkles,
 } from "lucide-react";
-import ClientMediaAdmin, { ClientStandingsEditor } from "./ClientMediaAdmin";
+import ClientMediaAdmin from "./ClientMediaAdmin";
 
 const PAGE_BG =
   "bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)]";
@@ -243,9 +243,8 @@ const ViewClient = () => {
           </motion.section>
         </div>
 
-        {/* Admin management: client gallery + performance standings */}
+        {/* Admin management: client gallery */}
         <ClientMediaAdmin clientId={client._id} />
-        <ClientStandingsEditor clientId={client._id} />
       </div>
     </div>
   );

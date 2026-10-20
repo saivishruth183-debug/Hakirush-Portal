@@ -320,6 +320,8 @@ test("shared performance standings are visible to every client and editable by a
   assert.equal(empty.status, 200);
   assert.deepEqual(empty.body.standings, []);
   assert.equal(empty.body.updatedAt, null);
+  await Client.updateOne({ _id: A().client._id }, { companyLogo: "https://images.test/client-a.png" });
+  await Client.updateOne({ _id: B().client._id }, { companyLogo: "https://images.test/client-b.png" });
 
   const standings = [
     { clientId: A().client._id, clientName: "Submitted name is ignored", played: 8, won: 6, lost: 2, points: 999 },
@@ -352,15 +354,16 @@ test("shared performance standings are visible to every client and editable by a
   const clientA = await request(app).get("/api/client/shared/performance").set(auth(A().user));
   const clientB = await request(app).get("/api/client/shared/performance").set(auth(B().user));
   const expected = [
-    { clientId: String(A().client._id), clientName: "Client A", played: 8, won: 6, lost: 2, points: 12 },
-    { clientId: String(B().client._id), clientName: "Client B", played: 8, won: 5, lost: 3, points: 10 },
+    { clientId: String(A().client._id), clientName: "Client A", companyLogo: "https://images.test/client-a.png", played: 8, won: 6, lost: 2, points: 12 },
+    { clientId: String(B().client._id), clientName: "Client B", companyLogo: "https://images.test/client-b.png", played: 8, won: 5, lost: 3, points: 10 },
   ];
   assert.deepEqual(clientA.body.standings, expected);
   assert.deepEqual(clientB.body.standings, expected);
   const ownA = await request(app).get("/api/client/me/performance").set(auth(A().user));
   const ownB = await request(app).get("/api/client/me/performance").set(auth(B().user));
-  assert.deepEqual(ownA.body.standings, [expected[0]]);
-  assert.deepEqual(ownB.body.standings, [expected[1]]);
+  const expectedOwnStandings = expected.map(({ companyLogo, ...standing }) => standing);
+  assert.deepEqual(ownA.body.standings, [expectedOwnStandings[0]]);
+  assert.deepEqual(ownB.body.standings, [expectedOwnStandings[1]]);
   assert.equal((await request(app).put("/api/client/shared/performance").set(auth(A().user)).send({ standings })).status, 403);
   assert.equal((await request(app).get("/api/client/shared/performance").set(auth(fx.itDev1.user))).status, 403);
 });

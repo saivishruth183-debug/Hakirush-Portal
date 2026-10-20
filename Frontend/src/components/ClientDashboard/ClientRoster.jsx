@@ -29,6 +29,10 @@ const SIZES = [
   { value: "XXL", label: "Double XL" },
 ];
 
+// UI-only: a little emoji per event (falls back to 🏆)
+const EVENT_EMOJI = { Cricket: "🏏", Football: "⚽", Badminton: "🏸", Volleyball: "🏐", Kabaddi: "🤼", Athletics: "🏃" };
+const emojiFor = (ev) => EVENT_EMOJI[ev] || "🏆";
+
 const avatarColors = [
   "from-red-500 to-rose-600",
   "from-sky-500 to-blue-600",
@@ -182,9 +186,14 @@ const ClientRelationship = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Kit order follows the event filter (UI-only)
+  const kitPool = useMemo(
+    () => (eventFilter === "All" ? employees : employees.filter((e) => e.event === eventFilter)),
+    [employees, eventFilter]
+  );
   const sizeCounts = useMemo(
-    () => SIZES.map((s) => ({ ...s, count: employees.filter((e) => e.jerseySize === s.value).length })),
-    [employees]
+    () => SIZES.map((s) => ({ ...s, count: kitPool.filter((e) => e.jerseySize === s.value).length })),
+    [kitPool]
   );
   const maxSize = Math.max(...sizeCounts.map((s) => s.count), 1);
 
@@ -207,37 +216,38 @@ const ClientRelationship = () => {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] text-slate-900 font-sans selection:bg-red-200/60">
-      {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden bg-slate-950 text-white">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/95 to-red-950/80" />
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-red-600/30 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 w-64 h-64 rounded-full bg-rose-500/10 blur-3xl" />
-
-        <div className="relative max-w-6xl mx-auto px-6 md:px-10 pt-10 pb-20 md:pt-14 md:pb-24">
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[11px] font-semibold uppercase tracking-[0.2em] text-red-300">
-              <Shirt size={13} /> Kit Allocation
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-10 pt-6 md:pt-8 pb-16 space-y-8 relative">
+        {/* ================= HERO ================= */}
+        <motion.section
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+          className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-6 text-white shadow-2xl shadow-red-600/30 sm:p-8 md:p-10"
+        >
+          <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-orange-300/25 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:28px_28px]" />
+          <Shirt size={220} strokeWidth={1} className="pointer-events-none absolute -bottom-10 right-4 hidden text-white/10 md:block" />
+          <div className="relative">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ring-1 ring-white/25">
+              <Shirt size={13} /> Kit allocation
             </span>
-            <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight leading-[1.05]">
-              Roster & Apparel <span className="text-red-500">Management</span>
+            <h1 className="mt-4 text-3xl font-black leading-[1.05] tracking-tight md:text-5xl">
+              Roster & apparel
             </h1>
-            <p className="mt-3 text-sm md:text-base text-slate-400 max-w-xl">
+            <p className="mt-3 max-w-xl text-sm text-white/85 md:text-base">
               Register players for each event, assign jersey sizes and keep your kit order ready in one place.
             </p>
-          </motion.div>
-        </div>
-      </section>
+          </div>
+        </motion.section>
 
-      <div className="max-w-6xl mx-auto px-6 md:px-10 -mt-12 pb-16 space-y-8 relative">
         {/* ================= STATS ================= */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard i={0} icon={Users} label="Players Registered" value={employees.length} tone="bg-slate-900 shadow-slate-900/20" />
-          <StatCard i={1} icon={Trophy} label="Events Covered" value={Object.keys(eventCounts).length} tone="bg-red-600 shadow-red-600/30" />
+          <StatCard i={0} icon={Users} label="Players Registered" value={employees.length} tone="bg-gradient-to-br from-red-600 to-rose-500 shadow-red-600/30" />
+          <StatCard i={1} icon={Trophy} label="Events Covered" value={Object.keys(eventCounts).length} tone="bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-violet-500/30" />
           <StatCard
             i={2}
             icon={Shirt}
             label="Most Popular Event"
-            value={topEvent ? topEvent[0] : "—"}
+            value={topEvent ? `${emojiFor(topEvent[0])} ${topEvent[0]}` : "—"}
             sub={topEvent ? `${topEvent[1]} players` : "No entries yet"}
             tone="bg-emerald-500 shadow-emerald-500/30"
           />
@@ -250,10 +260,10 @@ const ClientRelationship = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="lg:col-span-3 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 p-6 md:p-8 space-y-6"
+            className="lg:col-span-3 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-red-900/5 p-6 md:p-8 space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-red-50 border border-red-100">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-600 to-rose-500 shadow-lg shadow-red-600/30 [&>svg]:!text-white">
                 <PlusCircle size={18} className="text-red-600" />
               </div>
               <div>
@@ -279,22 +289,31 @@ const ClientRelationship = () => {
 
             {/* Event */}
             <Field label="Event">
-              <div className="relative">
-                <Trophy size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <select
-                  name="event"
-                  value={formData.event}
-                  onChange={handleInputChange}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-2xl py-3.5 pl-11 pr-10 text-sm font-semibold focus:outline-none focus:border-red-300 focus:bg-white focus:ring-4 focus:ring-red-100 transition appearance-none ${
-                    formData.event ? "text-slate-800" : "text-slate-400"
-                  }`}
-                >
-                  <option value="" disabled hidden>Select an event</option>
-                  {EVENTS.map((ev) => (
-                    <option key={ev} value={ev}>{ev}</option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Event">
+                {EVENTS.map((ev) => {
+                  const active = formData.event === ev;
+                  return (
+                    <button
+                      type="button"
+                      key={ev}
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => { setFormData((p) => ({ ...p, event: ev })); setError(""); }}
+                      className={`relative flex items-center gap-2.5 rounded-2xl px-3 py-3 text-left transition-all ${
+                        active
+                          ? "bg-red-50 ring-2 ring-red-400"
+                          : "bg-slate-50 ring-1 ring-slate-200 hover:bg-white hover:ring-red-200"
+                      }`}
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg ${active ? "bg-white shadow" : "bg-white/70"}`}>{emojiFor(ev)}</span>
+                      <span className="min-w-0">
+                        <span className={`block truncate text-sm font-bold ${active ? "text-red-700" : "text-slate-800"}`}>{ev}</span>
+                        <span className="block text-[10px] font-semibold text-slate-400">{eventCounts[ev] || 0} registered</span>
+                      </span>
+                      {active && <CheckCircle2 size={15} className="absolute right-2 top-2 text-red-600" />}
+                    </button>
+                  );
+                })}
               </div>
             </Field>
 
@@ -339,10 +358,10 @@ const ClientRelationship = () => {
             <button
               type="submit"
               disabled={loading || submitting}
-              className="w-full bg-slate-950 hover:bg-red-600 text-white rounded-2xl py-4 px-6 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-red-600/25 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full bg-gradient-to-r from-red-600 to-rose-500 hover:brightness-110 text-white rounded-2xl py-4 px-6 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-600/30 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <PlusCircle size={17} />
-              {submitting ? "Adding…" : "Add to roster"}
+              {submitting ? "Adding…" : formData.name.trim() ? `Add ${formData.name.trim().split(" ")[0]} to roster` : "Add to roster"}
             </button>
           </motion.form>
 
@@ -351,16 +370,18 @@ const ClientRelationship = () => {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
-            className="lg:col-span-2 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 p-6 md:p-8"
+            className="lg:col-span-2 bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-red-900/5 p-6 md:p-8"
           >
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-red-50 border border-red-100">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-600 to-rose-500 shadow-lg shadow-red-600/30 [&>svg]:!text-white">
                   <Shirt size={18} className="text-red-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-extrabold tracking-tight">Kit order</h2>
-                  <p className="text-xs text-slate-400">Jerseys needed per size</p>
+                  <p className="text-xs text-slate-400">
+                    Jerseys needed per size{eventFilter !== "All" && <> · <span className="font-semibold text-red-600">{emojiFor(eventFilter)} {eventFilter}</span></>}
+                  </p>
                 </div>
               </div>
             </div>
@@ -368,7 +389,7 @@ const ClientRelationship = () => {
             <div className="space-y-3.5">
               {sizeCounts.map((s, i) => (
                 <div key={s.value} className="flex items-center gap-3">
-                  <span className="w-11 text-xs font-black text-slate-700">{s.value}</span>
+                  <span className="w-11 text-xs font-black text-slate-700" title={s.label}>{s.value}</span>
                   <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden">
                     <motion.div
                       initial={false}
@@ -383,8 +404,8 @@ const ClientRelationship = () => {
             </div>
 
             <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-sm text-slate-500">Total jerseys</span>
-              <span className="text-2xl font-black text-slate-900 tabular-nums">{employees.length}</span>
+              <span className="text-sm text-slate-500">Total jerseys{eventFilter !== "All" ? ` (${eventFilter})` : ""}</span>
+              <span className="text-2xl font-black text-slate-900 tabular-nums">{kitPool.length}</span>
             </div>
           </motion.div>
         </div>
@@ -394,7 +415,7 @@ const ClientRelationship = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-slate-200/40 overflow-hidden"
+          className="bg-white border border-slate-200/70 rounded-3xl shadow-lg shadow-red-900/5 overflow-hidden"
         >
           {/* Toolbar */}
           <div className="p-5 md:p-6 border-b border-slate-100 space-y-4">
@@ -445,7 +466,7 @@ const ClientRelationship = () => {
                         : "bg-white text-slate-600 border-slate-200 hover:border-red-200 hover:text-red-600"
                     }`}
                   >
-                    {ev}
+                    {ev !== "All" && <span>{emojiFor(ev)}</span>}{ev}
                     <span className={`text-[10px] px-1.5 rounded-full ${eventFilter === ev ? "bg-white/20" : "bg-slate-100 text-slate-400"}`}>
                       {ev === "All" ? employees.length : eventCounts[ev]}
                     </span>
@@ -457,11 +478,19 @@ const ClientRelationship = () => {
 
           {/* Table */}
           {loading ? (
-            <p role="status" className="py-16 px-6 text-center text-sm text-slate-400">Loading roster…</p>
+            <div role="status" aria-label="Loading roster" className="divide-y divide-slate-50">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex animate-pulse items-center gap-4 px-6 py-4">
+                  <div className="h-10 w-10 rounded-xl bg-slate-100" />
+                  <div className="h-4 w-1/4 rounded bg-slate-100" />
+                  <div className="ml-auto h-6 w-12 rounded-lg bg-slate-100" />
+                </div>
+              ))}
+            </div>
           ) : employees.length === 0 ? (
             <div className="py-16 px-6 text-center">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4">
-                <ShieldCheck size={28} className="text-slate-300" />
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 ring-1 ring-red-100 flex items-center justify-center mb-4">
+                <ShieldCheck size={28} className="text-red-400" />
               </div>
               <p className="font-bold text-slate-700">No players yet</p>
               <p className="text-sm text-slate-400 mt-1">Add your first player using the form above.</p>
@@ -469,8 +498,35 @@ const ClientRelationship = () => {
           ) : filtered.length === 0 ? (
             <p className="py-12 text-center text-sm text-slate-400">No players match your search.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[600px]">
+            <>
+            {/* MOBILE CARDS */}
+            <div className="space-y-2 p-4 md:hidden">
+              <AnimatePresence initial={false}>
+                {filtered.map((emp) => (
+                  <motion.div key={emp.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 30 }}
+                    className="flex items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${colorFor(emp.name)} text-sm font-black text-white shadow-md`}>
+                      {initials(emp.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-800">{emp.name}</p>
+                      <p className="truncate text-xs text-slate-500">{emojiFor(emp.event)} {emp.event} · <Clock size={10} className="inline" /> {emp.registrationTime}</p>
+                    </div>
+                    <span className="inline-flex min-w-[40px] items-center justify-center rounded-lg bg-red-600 px-2 py-1 text-xs font-black text-white">{emp.jerseySize}</span>
+                    <button
+                      onClick={() => handleDelete(emp.id)}
+                      disabled={deletingId === emp.id}
+                      className="rounded-xl p-2 text-slate-300 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-50"
+                      aria-label={`Remove ${emp.name}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+            <div className="hidden md:block">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
                     <th className="py-3.5 px-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Player</th>
@@ -502,11 +558,11 @@ const ClientRelationship = () => {
                         </td>
                         <td className="py-4 px-4">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">
-                            <Trophy size={12} className="text-red-500" /> {emp.event}
+                            <span>{emojiFor(emp.event)}</span> {emp.event}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-center">
-                          <span className="inline-flex items-center justify-center min-w-[44px] px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs font-black">
+                          <span className="inline-flex items-center justify-center min-w-[44px] px-2.5 py-1 rounded-lg bg-gradient-to-r from-red-600 to-rose-500 text-white text-xs font-black shadow shadow-red-600/20">
                             {emp.jerseySize}
                           </span>
                         </td>
@@ -532,6 +588,7 @@ const ClientRelationship = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </motion.div>
       </div>
@@ -587,7 +644,7 @@ const StatCard = ({ icon: Icon, label, value, sub, tone, i }) => (
     initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: i * 0.07 }}
-    className="bg-white rounded-3xl border border-slate-200/70 shadow-lg shadow-slate-200/40 p-5 flex items-center gap-4"
+    className="bg-white rounded-3xl border border-slate-200/70 shadow-lg shadow-red-900/5 p-5 flex items-center gap-4"
   >
     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg ${tone}`}>
       <Icon size={20} />
