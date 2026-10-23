@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/authContext";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -658,21 +658,38 @@ const AdminSummary = () => {
         {/* ================= ORG NUMBERS ================= */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
           {[
-            [Users, "Total workforce", summary?.totalEmployees, C.brand, "Active employees"],
+            [Users, "Active employees", summary?.totalEmployees, C.brand, "View employee list"],
             [Building, "Departments", summary?.totalDepartments, C.slate, data.depts[0] ? `Largest: ${data.depts[0].name}` : "—"],
             [BriefcaseBusiness, "Clients", summary?.totalClients, C.amber, `${summary?.totalAnnual || 0} annual · ${summary?.totalQuarterly || 0} quarterly`],
-          ].map(([Icon, label, val, color, hint], idx) => (
-            <Card key={label} i={idx} className="group flex items-center gap-5 p-6 transition-transform duration-300 hover:-translate-y-1">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)`, boxShadow: `0 10px 24px -8px ${color}80` }}>
-                <Icon size={24} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-500">{label}</p>
-                <p className="text-3xl font-extrabold tracking-tight text-gray-900 tabular-nums"><Num value={val} /></p>
-                <p className="truncate text-xs text-gray-400">{hint}</p>
-              </div>
-            </Card>
-          ))}
+          ].map(([Icon, label, val, color, hint], idx) => {
+            const isEmployeeCard = label === "Active employees";
+            const card = (
+              <Card i={idx} className="group flex items-center gap-5 p-6 transition-transform duration-300 hover:-translate-y-1">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)`, boxShadow: `0 10px 24px -8px ${color}80` }}>
+                  <Icon size={24} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-500">{label}</p>
+                  <p className="text-3xl font-extrabold tracking-tight text-gray-900 tabular-nums"><Num value={val} /></p>
+                  <p className="truncate text-xs text-gray-400">{hint}</p>
+                </div>
+                {isEmployeeCard && <ArrowUpRight size={18} aria-hidden="true" className="ml-auto shrink-0 text-gray-400 transition group-hover:text-red-600" />}
+              </Card>
+            );
+
+            return isEmployeeCard ? (
+              <Link
+                key={label}
+                to="/admin-dashboard/employees?status=active"
+                aria-label="View active employees"
+                className="block rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              >
+                {card}
+              </Link>
+            ) : (
+              <React.Fragment key={label}>{card}</React.Fragment>
+            );
+          })}
         </div>
 
         {/* ================= CHARTS ================= */}
