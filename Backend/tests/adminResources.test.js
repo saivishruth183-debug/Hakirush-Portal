@@ -119,7 +119,31 @@ describe("dashboard", () => {
     assert.equal((await request(app).get("/api/dashboard/summary").set(auth(fx.clientA.user))).status, 403);
     const r = await request(app).get("/api/dashboard/summary").set(asAdmin());
     assert.equal(r.status, 200);
-    assert.equal(r.body.totalEmployees, 7);
+    assert.equal(r.body.totalEmployees, 6);
+    assert.deepEqual(
+      r.body.departmentSummary.map(({ department, employees }) => [department, employees]).sort(),
+      [["IT", 3], ["Operations", 3]]
+    );
+
+    const deactivated = await request(app)
+      .patch(`/api/employee/${fx.opsStaff1.employee._id}/status`)
+      .set(asAdmin())
+      .send({ isActive: false });
+    assert.equal(deactivated.status, 200);
+    const afterDeactivation = await request(app).get("/api/dashboard/summary").set(asAdmin());
+    assert.equal(afterDeactivation.body.totalEmployees, 5);
+    assert.deepEqual(
+      afterDeactivation.body.departmentSummary.map(({ department, employees }) => [department, employees]).sort(),
+      [["IT", 3], ["Operations", 2]]
+    );
+
+    const reactivated = await request(app)
+      .patch(`/api/employee/${fx.opsStaff1.employee._id}/status`)
+      .set(asAdmin())
+      .send({ isActive: true });
+    assert.equal(reactivated.status, 200);
+    const afterReactivation = await request(app).get("/api/dashboard/summary").set(asAdmin());
+    assert.equal(afterReactivation.body.totalEmployees, 6);
   });
 
   test("leave summary excludes orphaned requests and reflects resolved pending requests", async () => {
