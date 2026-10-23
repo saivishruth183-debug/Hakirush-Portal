@@ -1,6 +1,6 @@
 import axios from "axios";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmployeeButtons } from "../../utils/EmployeeHelper";
 import {
@@ -106,11 +106,15 @@ const Skeleton = ({ className = "" }) => <div className={`animate-pulse rounded-
 
 /* ================= PAGE ================= */
 const List = () => {
+  const [searchParams] = useSearchParams();
   const [employees, setEmployees] = useState([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "active" | "inactive"
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const requestedStatus = searchParams.get("status");
+    return requestedStatus === "active" || requestedStatus === "inactive" ? requestedStatus : "all";
+  }); // "all" | "active" | "inactive"
   const [deptFilter, setDeptFilter] = useState("all");
   const [sort, setSort] = useState("id");
   const [view, setView] = useState("list");
@@ -387,7 +391,7 @@ const List = () => {
             {(hasStatusData || isFiltered) && (
               <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
                 {hasStatusData &&
-                  [["all", "Everyone"], ["active", "Active"], ["inactive", "Inactive"]].map(([key, label]) => {
+                  [ ["active", "Active"], ["inactive", "Inactive"] , ["all", "Everyone"]].map(([key, label]) => {
                     const on = statusFilter === key;
                     return (
                       <button
