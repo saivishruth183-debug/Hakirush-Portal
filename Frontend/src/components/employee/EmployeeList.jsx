@@ -391,7 +391,7 @@ const List = () => {
             {(hasStatusData || isFiltered) && (
               <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
                 {hasStatusData &&
-                  [ ["active", "Active"], ["inactive", "Inactive"] , ["all", "Everyone"]].map(([key, label]) => {
+                  [ ["all", "Everyone"], ["active", "Active"], ["inactive", "Inactive"] ].map(([key, label]) => {
                     const on = statusFilter === key;
                     return (
                       <button
