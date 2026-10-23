@@ -9,7 +9,23 @@ import { sendError } from "../middleware/errorHandler.js";
 const getSummary = async (req, res) => {
   try {
     /* ========== BASIC COUNTS ========== */
-    const totalEmployees = await Employee.countDocuments();
+    const activeEmployeeLookup = [
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      { $match: { "user.isActive": { $ne: false } } },
+    ];
+    const [employeeCount] = await Employee.aggregate([
+      ...activeEmployeeLookup,
+      { $count: "total" },
+    ]);
+    const totalEmployees = employeeCount?.total || 0;
     const totalDepartments = await Department.countDocuments();
     const totalClients = await Client.countDocuments();
     const totalSponsors = await Sponsor.countDocuments();
@@ -49,6 +65,7 @@ const getSummary = async (req, res) => {
 
     /* ========== DEPARTMENT SUMMARY ========== */
     const departmentSummary = await Employee.aggregate([
+      ...activeEmployeeLookup,
       {
         $group: {
           _id: "$department",
@@ -131,13 +148,14 @@ const sponsorSummary = {
 
       // Use the same logic as getAllEmployeeBirthdays in employeeController.js for consistency
       const employees = await Employee.find({ dob: { $ne: null } })
-        .populate("userId", "name profileImage")
+        .populate("userId", "name profileImage isActive")
         .populate("department", "dep_name");
 
       const todayBirthdays = [];
       const upcomingBirthdays = [];
 
       employees.forEach(emp => {
+        if (emp.userId?.isActive === false) return;
         const d = new Date(emp.dob);
         const m = d.getMonth() + 1;
         const day = d.getDate();
