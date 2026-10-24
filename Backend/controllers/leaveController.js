@@ -11,15 +11,25 @@ import { now as clockNow } from "../services/clock.js";
 import { getEmployeeForUser, resolveEmployeeForCaller } from "../services/employeeScope.js";
 import { storedDateToYmd, ymdToDate, countWorkingDays } from "../services/businessCalendar.js";
 import {
-  LEAVE_TYPES,
+  ALL_LEAVE_TYPES,
+  COMP_OFF,
+  MATERNITY,
+  PATERNITY,
   MAX_LEAVE_SPAN_DAYS,
+  MATERNITY_MAX_CALENDAR_DAYS,
+  PATERNITY_DAYS_PER_PERIOD,
+  COMP_OFF_VALID_DAYS,
   computeLeaveDays,
   computeLeaveBalance,
+  computeExtraBalances,
   findOverlappingLeave,
   formatLeaveRange,
 } from "../services/leaveService.js";
 
 const REASON_MAX = 1000;
+
+/* Days between two YYYY-MM-DD strings, inclusive. */
+const calendarSpan = (a, b) => Math.round((ymdToDate(b) - ymdToDate(a)) / 86400000) + 1;
 const REVIEW_DECISIONS = ["Approved", "Rejected"];
 const LEAVE_STATUSES = ["Pending", "Approved", "Rejected", "Cancelled"];
 
@@ -57,20 +67,61 @@ const notifyAdmins = async (type, message, data) => {
 /* ================= ADD LEAVE (EMPLOYEE) ================= */
 const addLeave = asyncHandler(async (req, res) => {
   const body = req.body || {};
-  const leaveType = requireEnum(body.leaveType, LEAVE_TYPES, "leaveType");
+  const leaveType = requireEnum(body.leaveType, ALL_LEAVE_TYPES, "leaveType");
   const startYmd = requireYmd(body.startDate, "startDate");
   const endYmd = requireYmd(body.endDate, "endDate");
   const reason = trimmedString(body.reason, "reason", { max: REASON_MAX, optional: true }) || "";
   if (endYmd < startYmd) throw badRequest("End date must be on or after start date");
-  if (endYmd > addDays(startYmd, MAX_LEAVE_SPAN_DAYS - 1)) {
+  if (leaveType === MATERNITY) {
+    if (calendarSpan(startYmd, endYmd) > MATERNITY_MAX_CALENDAR_DAYS) {
+      throw badRequest(`Maternity leave can cover at most ${MATERNITY_MAX_CALENDAR_DAYS} days (26 weeks) per application`);
+    }
+  } else if (endYmd > addDays(startYmd, MAX_LEAVE_SPAN_DAYS - 1)) {
     throw badRequest(`A leave application cannot span more than ${MAX_LEAVE_SPAN_DAYS} days`);
   }
 
   const employee = await getEmployeeForUser(req.user._id);
+  const employeeGender = String(employee.gender || "").trim().toLowerCase();
+  if (leaveType === MATERNITY && employeeGender !== "female") {
+    throw forbidden("Maternity leave is only available to female employees");
+  }
+  if (leaveType === PATERNITY && employeeGender !== "male") {
+    throw forbidden("Paternity leave is only available to male employees");
+  }
 
   // Client-sent `days` is ignored: the server computes working days.
   const days = await computeLeaveDays(startYmd, endYmd);
   if (days < 1) throw badRequest("The selected range has no working days");
+
+  /* ---- type-specific rules ---- */
+  let compOffFor = null;
+  if (leaveType === COMP_OFF) {
+    const workedYmd = requireYmd(body.compOffFor, "compOffFor");
+    const today = businessDate(clockNow());
+    if (workedYmd > today) throw badRequest("The day you worked can't be in the future");
+    if (workedYmd < addDays(today, -COMP_OFF_VALID_DAYS)) {
+      throw badRequest(`Comp-off must be claimed within ${COMP_OFF_VALID_DAYS} days of the day you worked`);
+    }
+    if (startYmd <= workedYmd) throw badRequest("Comp-off must be taken after the day you worked");
+    if ((await computeLeaveDays(workedYmd, workedYmd)) !== 0) {
+      throw badRequest("Comp-off can only be earned for a weekend or holiday you worked");
+    }
+    if (days !== 1) throw badRequest("One worked day earns one comp-off day. Pick a single working day.");
+    const already = await Leave.exists({
+      employeeId: employee._id,
+      leaveType: COMP_OFF,
+      compOffFor: ymdToDate(workedYmd),
+      status: { $in: ["Pending", "Approved"] },
+    });
+    if (already) throw conflict("You've already claimed comp-off for that day", "CONFLICT");
+    compOffFor = ymdToDate(workedYmd);
+  }
+  if (leaveType === PATERNITY) {
+    const extra = await computeExtraBalances(employee._id, clockNow());
+    if (days > extra.paternity.balance) {
+      throw badRequest(`Only ${extra.paternity.balance} paternity day(s) left (${PATERNITY_DAYS_PER_PERIOD} per year)`);
+    }
+  }
 
   const overlap = await findOverlappingLeave(employee._id, startYmd, endYmd);
   if (overlap) {
@@ -92,10 +143,12 @@ const addLeave = asyncHandler(async (req, res) => {
     reason,
     status: isSelfManager ? "Approved" : "Pending",
     days,
+    ...(compOffFor ? { compOffFor } : {}),
   });
 
   const balance = await computeLeaveBalance(employee._id, clockNow());
-  const typeBalance = leaveType === "Sick Leave" ? balance.sick : balance.casual;
+  // Only Casual / Sick have a yearly quota in computeLeaveBalance.
+  const typeBalance = leaveType === "Sick Leave" ? balance.sick : leaveType === "Casual Leave" ? balance.casual : null;
 
   let managerNotified = false;
   if (dept && dept.managerEmployeeId) {
@@ -104,7 +157,7 @@ const addLeave = asyncHandler(async (req, res) => {
       if (managerEmp?.userId && managerEmp.userId.isActive !== false) {
         await Notification.create({
           type: "leave-request",
-          message: `${req.user.name || "An employee"} applied for ${leaveType} leave (${days} days)`,
+          message: `${req.user.name || "An employee"} applied for ${leaveType} (${days} day${days === 1 ? "" : "s"})`,
           data: { leaveId: leave._id, employeeId: employee._id, adminId: managerEmp.userId._id, link: "/employee-dashboard" } // Manager views it on their dash
         });
         sendLeaveRequestToManagerEmail(managerEmp.userId, employee, leave);
@@ -117,13 +170,13 @@ const addLeave = asyncHandler(async (req, res) => {
   }
 
   // Also notify admins always
-  await notifyAdmins("leave-request", `${req.user.name || "An employee"} applied for ${leaveType} leave (${days} days)`, {
+  await notifyAdmins("leave-request", `${req.user.name || "An employee"} applied for ${leaveType} (${days} day${days === 1 ? "" : "s"})`, {
     leaveId: leave._id,
     employeeId: employee._id,
     link: "/admin-dashboard/leaves",
   });
 
-  return res.status(200).json({ success: true, leave, exceedsBalance: days > typeBalance.balance });
+  return res.status(200).json({ success: true, leave, exceedsBalance: typeBalance ? days > typeBalance.balance : false });
 });
 
 /* ================= UPDATE LEAVE STATUS (ADMIN REVIEW) ================= */
@@ -229,15 +282,21 @@ const cancelLeave = asyncHandler(async (req, res) => {
 // Also mounted by the employee router at /api/employee/leave/balance/me.
 const getLeaveBalance = asyncHandler(async (req, res) => {
   const employee = await getEmployeeForUser(req.user._id);
-  const balance = await computeLeaveBalance(employee._id, clockNow());
-  return res.status(200).json({ success: true, ...balance });
+  const [balance, extra] = await Promise.all([
+    computeLeaveBalance(employee._id, clockNow()),
+    computeExtraBalances(employee._id, clockNow()),
+  ]);
+  return res.status(200).json({ success: true, ...balance, ...extra });
 });
 
 /* ================= GET LEAVE BALANCE BY EMPLOYEE ID (ADMIN, SELF) ================= */
 const getLeaveBalanceByEmployeeId = asyncHandler(async (req, res) => {
   const employee = await resolveEmployeeForCaller(req, req.params.employeeId, "employeeId");
-  const balance = await computeLeaveBalance(employee._id, clockNow());
-  return res.status(200).json({ success: true, ...balance });
+  const [balance, extra] = await Promise.all([
+    computeLeaveBalance(employee._id, clockNow()),
+    computeExtraBalances(employee._id, clockNow()),
+  ]);
+  return res.status(200).json({ success: true, ...balance, ...extra });
 });
 
 /* ================= GET MY LEAVES (EMPLOYEE) ================= */

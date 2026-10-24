@@ -87,6 +87,8 @@ export interface SessionUser {
   /** Employee only: business code e.g. HAKI0001. */
   employeeId?: EmployeeCode;
   designation?: string;
+  /** Employee HR record field; absent for clients and null when not recorded. */
+  gender?: string | null;
   employeeRecordId?: EmployeeRecordId;
   departmentId?: DepartmentId | null;
   departmentName?: string;

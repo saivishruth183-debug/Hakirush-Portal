@@ -38,6 +38,7 @@ const StallView = lazy(() => import("./components/stalls/StallView"));
 const AdminAttendence = lazy(() => import("./components/attendance/AdminAttendance"));
 const AdminAttendenceReport = lazy(() => import("./components/attendance/AdminAttendanceReport"));
 const AdminAttendanceRequests = lazy(() => import("./components/attendance/AdminAttendanceRequests"));
+const TeamAttendanceRequests = lazy(() => import("./components/attendance/TeamAttendanceRequests"));
 const AdminLeaveTable = lazy(() => import("./components/leave/AdminLeaveTable"));
 const LeaveDetails = lazy(() => import("./components/leave/LeaveDetails"));
 const EmployeeLeaveList = lazy(() => import("./components/leave/EmployeeLeaveList"));
@@ -164,6 +165,7 @@ const App = () => {
             <Route path="expenses" element={<EmployeeExpenses />} />
             <Route path="team-requests" element={<TeamRequests />} />
             <Route path="team-requests/:id" element={<LeaveDetails />} />
+            <Route path="team-attendance-requests" element={<TeamAttendanceRequests />} />
             <Route path="payslips/:id" element={<ViewPayslip />} />
             <Route path="setting" element={<EmployeeSetting />} />
           </Route>

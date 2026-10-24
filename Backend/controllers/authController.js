@@ -59,7 +59,7 @@ export const buildSessionUser = async (userDoc) => {
 
   if (u.role === "employee" || u.role === "admin") {
     const employee = await Employee.findOne({ userId: u._id })
-      .select("employeeId designation department")
+      .select("employeeId designation department gender")
       .lean();
     if (employee) {
       const dept = employee.department
@@ -67,6 +67,7 @@ export const buildSessionUser = async (userDoc) => {
         : null;
       sessionUser.employeeId = employee.employeeId;
       sessionUser.designation = employee.designation;
+      sessionUser.gender = employee.gender || null;
       sessionUser.employeeRecordId = employee._id;
       sessionUser.departmentId = dept ? dept._id : null;
       sessionUser.departmentName = dept ? dept.dep_name : null;
@@ -77,6 +78,7 @@ export const buildSessionUser = async (userDoc) => {
     } else if (u.role === "employee") {
       sessionUser.employeeId = null;
       sessionUser.designation = null;
+      sessionUser.gender = null;
       sessionUser.employeeRecordId = null;
       sessionUser.departmentId = null;
       sessionUser.departmentName = null;

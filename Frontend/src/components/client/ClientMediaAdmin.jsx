@@ -348,19 +348,19 @@ export const SharedGalleryManager = () => {
 const Card = ({ icon, title, subtitle, right, children }) => (
   <motion.section
     initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-    className={`${CARD} mt-6 p-5 sm:p-6`}
+    className={`${CARD} mt-6 p-4 sm:p-6`}
   >
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-md shadow-red-600/25">
+    <div className="mb-5 flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-md shadow-red-600/25">
           {icon}
         </span>
-        <div>
+        <div className="min-w-0">
           <h3 className="text-base font-bold text-gray-900">{title}</h3>
           {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
         </div>
       </div>
-      {right}
+        {right && <div className="shrink-0">{right}</div>}
     </div>
     {children}
   </motion.section>
@@ -1023,6 +1023,78 @@ export const ClientStandingsEditor = ({ clientId }) => {
       bad ? "ring-red-300 focus:ring-red-400 bg-red-50/40" : "ring-gray-200 focus:ring-red-400"
     }`;
 
+  const numFields = clientId ? NUMERIC_FIELDS : ["played", "won", "lost", "points"];
+
+  const rankBadge = (rank) =>
+    rank !== undefined ? (
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold tabular-nums ${rank < 3 ? MEDAL[rank] : "bg-gray-100 text-gray-500"}`}
+        title={rank < 3 ? `Rank ${rank + 1} (medal)` : `Rank ${rank + 1}`}>
+        {rank + 1}
+      </span>
+    ) : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-xs text-gray-300">–</span>;
+
+  const nameField = (r, issues) => !clientId ? (
+    <ClientPicker
+      clients={clients}
+      value={r.clientId}
+      unassigned={r.unassigned}
+      usedClientIds={rows
+        .filter((entry) => entry.key !== r.key && entry.clientId)
+        .map((entry) => entry.clientId)}
+      invalid={!!issues.clientId}
+      onChange={(value, name) => {
+        setSaved(false);
+        setDirty(true);
+        setRows((prev) => prev.map((entry) => entry.key === r.key
+          ? { ...entry, clientId: value, clientName: name, unassigned: false }
+          : entry));
+      }}
+    />
+  ) : (
+    <input
+      aria-label="Team name"
+      value={r.teamName}
+      maxLength={100}
+      placeholder="Team name"
+      onChange={(e) => updateRow(r.key, "teamName", e.target.value)}
+      className={`w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-900 outline-none ring-1 transition placeholder:font-normal placeholder:text-gray-300 focus:ring-2 ${
+        issues.teamName ? "ring-red-300 focus:ring-red-400" : "ring-gray-200 focus:ring-red-400"
+      }`}
+      title={issues.teamName || undefined}
+    />
+  );
+
+  const numField = (r, f, issues) => !clientId && f === "points" ? (
+    <div aria-label="Points" className="rounded-xl bg-slate-50 px-2 py-2 text-center text-sm font-bold tabular-nums text-slate-700 ring-1 ring-slate-100">
+      {(Number(r.won) || 0) * 2}
+    </div>
+  ) : (
+    <input
+      aria-label={f}
+      type="number"
+      min="0"
+      step="1"
+      inputMode="numeric"
+      value={r[f]}
+      onWheel={(e) => e.currentTarget.blur()}
+      onChange={(e) => updateRow(r.key, f, e.target.value)}
+      className={numCls(!!issues[f])}
+      title={issues[f] || undefined}
+    />
+  );
+
+  const removeBtn = (r) => (
+    <button
+      type="button"
+      onClick={() => removeRow(r.key)}
+      aria-label="Remove row"
+      title="Remove row"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+    >
+      <Trash2 size={15} />
+    </button>
+  );
+
   return (
     <Card
       icon={<Trophy size={18} />}
@@ -1042,8 +1114,51 @@ export const ClientStandingsEditor = ({ clientId }) => {
         <RetryBlock message={loadError} onRetry={() => { setLoading(true); load(); }} />
       ) : (
         <>
-          <div className="overflow-hidden rounded-2xl ring-1 ring-gray-100">
-            <div className="overflow-x-auto">
+          <div className="rounded-2xl ring-1 ring-gray-100">
+            {/* ---------- PHONE: one card per row ---------- */}
+            <div className="divide-y divide-gray-100 md:hidden">
+              <AnimatePresence initial={false}>
+                {displayRows.map(({ row: r }) => {
+                  const issues = rowIssues[r.key] || {};
+                  const played = Number(r.played) || 0;
+                  const winPct = played > 0 ? Math.min(100, Math.round((Number(r.won) / played) * 100)) : null;
+                  const nameIssue = issues.clientId || issues.teamName;
+                  const numIssue = numFields.map((f) => issues[f]).find(Boolean);
+                  return (
+                    <motion.div key={r.key} layout
+                      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
+                      className="p-3">
+                      <div className="flex items-center gap-2">
+                        {rankBadge(rankOf[r.key])}
+                        <div className="min-w-0 flex-1">{nameField(r, issues)}</div>
+                        {removeBtn(r)}
+                      </div>
+                      {nameIssue && <p className="mt-1 pl-9 text-[11px] font-semibold text-red-600">{nameIssue}</p>}
+                      <div className="mt-2.5 grid grid-cols-4 gap-1.5 pl-9">
+                        {numFields.map((f) => (
+                          <div key={f} className="min-w-0">
+                            <span className="mb-1 block text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">{FIELD_TITLES[f]}</span>
+                            {numField(r, f, issues)}
+                          </div>
+                        ))}
+                      </div>
+                      {numIssue && <p className="mt-1 pl-9 text-[11px] font-semibold text-red-600">{numIssue}</p>}
+                      {winPct !== null && (
+                        <div className="mt-2.5 flex items-center gap-2 pl-9">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div className="h-full rounded-full bg-gradient-to-r from-red-500 to-rose-400" style={{ width: `${winPct}%` }} />
+                          </div>
+                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-gray-600">{winPct}% wins</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* ---------- TABLET / DESKTOP: table ---------- */}
+            <div className="hidden overflow-x-auto rounded-2xl md:block">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-gray-50/80 text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -1051,11 +1166,11 @@ export const ClientStandingsEditor = ({ clientId }) => {
                     <th className="min-w-[10rem] px-2 py-3">{clientId ? "Team" : "Client"}</th>
                     {NUMERIC_FIELDS.map((f) => (
                       <th key={f} className="w-20 px-2 py-3 text-center" title={FIELD_TITLES[f]}>
-                        <span className="sm:hidden">{FIELD_LABELS[f]}</span>
-                        <span className="hidden sm:inline">{FIELD_TITLES[f]}</span>
+                        <span className="lg:hidden">{FIELD_LABELS[f]}</span>
+                        <span className="hidden lg:inline">{FIELD_TITLES[f]}</span>
                       </th>
                     ))}
-                    <th className="hidden w-24 px-2 py-3 text-center md:table-cell">Win %</th>
+                    <th className="hidden w-24 px-2 py-3 text-center lg:table-cell">Win %</th>
                     <th className="w-12 py-3 pl-2 pr-4" />
                   </tr>
                 </thead>
@@ -1071,68 +1186,12 @@ export const ClientStandingsEditor = ({ clientId }) => {
                         <motion.tr key={r.key} layout
                           initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
                           className="group transition-colors hover:bg-red-50/30">
-                          <td className="py-2 pl-4 pr-2">
-                            {rank !== undefined ? (
-                              <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${rank < 3 ? MEDAL[rank] : "bg-gray-100 text-gray-500"}`}
-                                title="Rank by points">
-                                {rank < 3 ? <Medal size={13} /> : rank + 1}
-                              </span>
-                            ) : <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-50 text-xs text-gray-300">–</span>}
-                          </td>
-                          {!clientId && (
-                            <td className="px-2 py-2 align-top">
-                              <ClientPicker
-                                clients={clients}
-                                value={r.clientId}
-                                unassigned={r.unassigned}
-                                usedClientIds={rows
-                                  .filter((entry) => entry.key !== r.key && entry.clientId)
-                                  .map((entry) => entry.clientId)}
-                                invalid={!!issues.clientId}
-                                onChange={(value, name) => {
-                                  setSaved(false);
-                                  setDirty(true);
-                                  setRows((prev) => prev.map((entry) => entry.key === r.key
-                                    ? { ...entry, clientId: value, clientName: name, unassigned: false }
-                                    : entry));
-                                }}
-                              />
-                            </td>
-                          )}
-                          {clientId && <td className="px-2 py-2">
-                            <input
-                              aria-label="Team name"
-                              value={r.teamName}
-                              maxLength={100}
-                              placeholder="Team name"
-                              onChange={(e) => updateRow(r.key, "teamName", e.target.value)}
-                              className={`w-full rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-900 outline-none ring-1 transition placeholder:font-normal placeholder:text-gray-300 focus:ring-2 ${
-                                issues.teamName ? "ring-red-300 focus:ring-red-400" : "ring-gray-200 focus:ring-red-400"
-                              }`}
-                              title={issues.teamName || undefined}
-                            />
-                          </td>}
-                          {(clientId ? NUMERIC_FIELDS : ["played", "won", "lost", "points"]).map((f) => (
-                            <td key={f} className="px-2 py-2">
-                              {!clientId && f === "points" ? (
-                                <div aria-label="Points" className="rounded-xl bg-slate-50 px-2 py-2 text-center text-sm font-bold tabular-nums text-slate-700 ring-1 ring-slate-100">
-                                  {(Number(r.won) || 0) * 2}
-                                </div>
-                              ) : <input
-                                aria-label={f}
-                                type="number"
-                                min="0"
-                                step="1"
-                                inputMode="numeric"
-                                value={r[f]}
-                                onWheel={(e) => e.currentTarget.blur()}
-                                onChange={(e) => updateRow(r.key, f, e.target.value)}
-                                className={numCls(!!issues[f])}
-                                title={issues[f] || undefined}
-                              />}
-                            </td>
+                          <td className="py-2 pl-4 pr-2">{rankBadge(rank)}</td>
+                          <td className="px-2 py-2 align-top">{nameField(r, issues)}</td>
+                          {numFields.map((f) => (
+                            <td key={f} className="px-2 py-2">{numField(r, f, issues)}</td>
                           ))}
-                          <td className="hidden px-2 py-2 md:table-cell">
+                          <td className="hidden px-2 py-2 lg:table-cell">
                             {winPct === null ? <p className="text-center text-xs text-gray-300">—</p> : (
                               <div>
                                 <p className="text-center text-xs font-bold text-gray-700">{Math.min(100, winPct)}%</p>
@@ -1142,17 +1201,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
                               </div>
                             )}
                           </td>
-                          <td className="py-2 pl-2 pr-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => removeRow(r.key)}
-                              aria-label="Remove row"
-                              title="Remove row"
-                              className="flex h-8 w-8 items-center justify-center rounded-xl text-gray-400 transition hover:bg-red-50 hover:text-red-600"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </td>
+                          <td className="py-2 pl-2 pr-4 text-right">{removeBtn(r)}</td>
                         </motion.tr>
                       );
                     })}
@@ -1201,7 +1250,7 @@ export const ClientStandingsEditor = ({ clientId }) => {
               </Notice>
             )}
           </AnimatePresence>
-          <p className="mt-3 text-[11px] text-gray-400">The medals show rank by points, wins, then fewest losses. Rows are saved in the order listed.</p>
+          <p className="mt-3 text-[11px] text-gray-400">Gold, silver and bronze show rank by points, wins, then fewest losses. Rows are saved in the order listed.</p>
         </>
       )}
     </Card>

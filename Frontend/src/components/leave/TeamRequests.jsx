@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Eye, ChevronLeft, ChevronRight, Search, ClipboardList, Calendar, CalendarClock, X, Clock3,
   CheckCircle2, XCircle, Inbox, Users, ArrowRight, Umbrella, Stethoscope, Briefcase, ClipboardCheck,
-  Building2, Info,
+  Building2, Info, Baby, HeartHandshake, Repeat, Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -78,7 +78,14 @@ const leaveOverlapsMonth = (leave, monthStart, monthEnd) => {
 const AVATAR_BG = ["from-red-500 to-rose-400", "from-violet-500 to-fuchsia-400", "from-sky-500 to-cyan-400", "from-amber-500 to-orange-400", "from-emerald-500 to-teal-400"];
 const colorFor = (s = "") => AVATAR_BG[[...String(s)].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_BG.length];
 const initials = (name = "") => String(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
-const typeIcon = (t = "") => (/sick|medical/i.test(t) ? Stethoscope : /casual/i.test(t) ? Umbrella : Briefcase);
+const typeIcon = (t = "") =>
+  /sick|medical/i.test(t) ? Stethoscope
+  : /casual/i.test(t) ? Umbrella
+  : /maternity/i.test(t) ? Baby
+  : /paternity/i.test(t) ? HeartHandshake
+  : /comp/i.test(t) ? Repeat
+  : /loss of pay|lop/i.test(t) ? Wallet
+  : Briefcase;
 const calDays = (s, e) => {
   if (!s || !e) return 0;
   const a = new Date(s), b = new Date(e);
@@ -146,7 +153,7 @@ const MobileLeaveCard = ({ leave, handleView, q }) => {
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       onClick={() => handleView(leave._id)}
-      className="relative cursor-pointer overflow-hidden rounded-2xl bg-white p-4 ring-1 ring-gray-100 transition active:scale-[0.99]">
+      className="relative min-w-0 cursor-pointer overflow-hidden rounded-2xl bg-white p-3.5 ring-1 ring-gray-100 transition active:scale-[0.99]">
       <span className={`absolute inset-y-0 left-0 w-1 ${t.strip}`} />
       <div className="flex items-start gap-3">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${colorFor(leave.name)} text-sm font-bold text-white`}>{initials(leave.name)}</div>
@@ -159,7 +166,8 @@ const MobileLeaveCard = ({ leave, handleView, q }) => {
       <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-bold text-gray-900"><TIcon size={14} className="text-red-500" />{leave.leaveType}</p>
-          <p className="text-xs text-gray-500">{shortDate(leave.startDate)} → {formatDate(leave.endDate)}{w && <span className={`ml-1 font-semibold ${w.tone}`}>· {w.text}</span>}</p>
+          <p className="text-xs leading-snug text-gray-500">{shortDate(leave.startDate)} → {formatDate(leave.endDate)}{w && <span className={`ml-1 font-semibold ${w.tone}`}>· {w.text}</span>}</p>
+          {leave.compOffFor && <p className="mt-0.5 text-[11px] font-semibold text-sky-600">Worked on {shortDate(leave.compOffFor)}</p>}
         </div>
         <div className="text-right">
           <p className="text-2xl font-extrabold leading-none tabular-nums text-gray-900">{leave.days}</p>
@@ -232,7 +240,8 @@ const TeamRequests = () => {
               status: leave.status,
               startDate: leave.startDate,
               endDate: leave.endDate,
-              reason: leave.reason
+              reason: leave.reason,
+              compOffFor: leave.compOffFor || null,
             };
           });
         setLeaves(data);
@@ -312,29 +321,29 @@ const TeamRequests = () => {
   ];
 
   return (
-    <div className={`min-h-screen ${PAGE_BG} pb-12`}>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG} pb-12`}>
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
 
         {/* HEADER */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
-              <ClipboardList size={26} />
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30 sm:h-14 sm:w-14">
+              <ClipboardList size={24} />
             </div>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Team requests</h1>
-              <p className="text-sm text-gray-500">Approve or reject leave for your department</p>
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Team requests</h1>
+              <p className="text-xs text-gray-500 sm:text-sm">Approve or reject leave for your department</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             {allPending > 0 && (
               <button onClick={() => setStatusFilter("Pending")}
-                className="inline-flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100">
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-amber-50 px-3 py-2.5 text-sm font-bold text-amber-800 sm:px-4 ring-1 ring-amber-200 transition hover:bg-amber-100">
                 <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" /></span>
                 {allPending} waiting for you
               </button>
             )}
-            <div className={`${CARD} inline-flex items-center gap-2 px-4 py-2.5 text-sm`}>
+            <div className={`${CARD} inline-flex items-center justify-center gap-2 whitespace-nowrap px-3 py-2.5 text-sm sm:px-4 ${allPending > 0 ? "" : "col-span-2"}`}>
               <Users size={15} className="text-violet-500" />
               <span className="font-bold text-gray-900">{onLeaveToday.length}</span>
               <span className="text-gray-500">on leave today</span>
@@ -344,14 +353,14 @@ const TeamRequests = () => {
 
         {/* MONTH BAR */}
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-2xl shadow-red-600/25 sm:p-6">
+          className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white shadow-2xl shadow-red-600/25 sm:p-6">
           <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/15 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-10 h-52 w-52 rounded-full bg-orange-300/25 blur-3xl" />
 
           <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-red-600 shadow-lg"><CalendarClock size={22} /></div>
-              <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-red-600 shadow-lg sm:h-12 sm:w-12"><CalendarClock size={22} /></div>
+              <div className="min-w-0 flex-1 sm:flex-none">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">Viewing</p>
                 <div className="relative h-8 overflow-hidden">
                   <AnimatePresence mode="popLayout" initial={false} custom={monthDir}>
@@ -363,22 +372,25 @@ const TeamRequests = () => {
                     </motion.p>
                   </AnimatePresence>
                 </div>
-                <p className="text-xs text-white/70">{formatDate(monthStart)} – {formatDate(monthEnd)} · {approvedDays} approved day{approvedDays === 1 ? "" : "s"}</p>
+                <p className="text-xs text-white/70">
+                  <span className="hidden sm:inline">{formatDate(monthStart)} – {formatDate(monthEnd)} · </span>
+                  {approvedDays} approved day{approvedDays === 1 ? "" : "s"}
+                </p>
               </div>
-              <div className="ml-auto flex items-center gap-1.5 lg:ml-4">
+              <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto lg:ml-4">
                 <button onClick={goToPrevMonth} aria-label="Previous month"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 transition hover:bg-white/25 active:scale-90"><ChevronLeft size={17} /></button>
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 transition hover:bg-white/25 active:scale-90"><ChevronLeft size={17} /></button>
                 {!isCurrentMonth(selectedMonth) ? (
                   <button onClick={goToCurrentMonth}
-                    className="h-9 whitespace-nowrap rounded-xl bg-white px-3 text-xs font-bold text-red-600 shadow transition hover:-translate-y-0.5">This month</button>
+                    className="h-9 flex-1 whitespace-nowrap rounded-xl bg-white px-3 text-xs font-bold text-red-600 shadow transition hover:-translate-y-0.5 sm:flex-none">This month</button>
                 ) : (
-                  <span className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/15 px-3 text-xs font-semibold ring-1 ring-white/25">
+                  <span className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-white/15 px-3 text-xs font-semibold ring-1 ring-white/25 sm:flex-none">
                     <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-70" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" /></span>
                     Current
                   </span>
                 )}
                 <button onClick={goToNextMonth} aria-label="Next month"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 transition hover:bg-white/25 active:scale-90"><ChevronRight size={17} /></button>
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 transition hover:bg-white/25 active:scale-90"><ChevronRight size={17} /></button>
               </div>
             </div>
 
@@ -387,11 +399,11 @@ const TeamRequests = () => {
                 const on = statusFilter === t.key;
                 return (
                   <button key={t.key} onClick={() => setStatusFilter(t.key)}
-                    className={`rounded-2xl px-3 py-2.5 text-left transition sm:min-w-[6.5rem] ${on ? "bg-white text-gray-900 shadow-lg" : "bg-white/15 ring-1 ring-white/20 hover:bg-white/25"}`}>
-                    <p className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${on ? "text-gray-500" : "text-white/75"}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${on ? (t.key === "Pending" ? "bg-amber-400" : t.key === "Approved" ? "bg-emerald-500" : t.key === "Rejected" ? "bg-red-500" : "bg-gray-400") : t.dot}`} />{t.label}
+                    className={`min-w-0 rounded-2xl px-2 py-2.5 text-left transition sm:min-w-[6.5rem] sm:px-3 ${on ? "bg-white text-gray-900 shadow-lg" : "bg-white/15 ring-1 ring-white/20 hover:bg-white/25"}`}>
+                    <p className={`flex min-w-0 items-center gap-1 text-[9px] font-bold uppercase tracking-normal sm:gap-1.5 sm:text-[10px] sm:tracking-wider ${on ? "text-gray-500" : "text-white/75"}`}>
+                      <span className={`hidden h-1.5 w-1.5 shrink-0 rounded-full sm:block ${on ? (t.key === "Pending" ? "bg-amber-400" : t.key === "Approved" ? "bg-emerald-500" : t.key === "Rejected" ? "bg-red-500" : "bg-gray-400") : t.dot}`} /><span className="truncate">{t.label}</span>
                     </p>
-                    <p className="text-2xl font-extrabold tabular-nums">{loading ? "–" : t.value}</p>
+                    <p className="text-xl font-extrabold tabular-nums sm:text-2xl">{loading ? "–" : t.value}</p>
                   </button>
                 );
               })}
@@ -401,7 +413,7 @@ const TeamRequests = () => {
 
         {/* LIST */}
         <div className={`${CARD} overflow-hidden`}>
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-5">
             <p className="text-sm text-gray-500">
               {statusFilter === "All" ? "All requests" : `${statusFilter} requests`} in <b className="text-gray-900">{monthLabel(selectedMonth)}</b>
               {statusFilter !== "All" && <button onClick={() => setStatusFilter("All")} className="ml-2 text-xs font-bold text-red-600 hover:underline">Clear</button>}
@@ -441,7 +453,7 @@ const TeamRequests = () => {
           ) : (
             <>
               {/* MOBILE */}
-              <div className="space-y-3 p-4 lg:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
                 {currentItems.map((leave) => (
                   <MobileLeaveCard key={leave._id} leave={leave} handleView={handleView} q={q} />
                 ))}
@@ -485,7 +497,9 @@ const TeamRequests = () => {
                           </td>
                           <td className="max-w-0 px-3 py-3.5 xl:w-[22%]">
                             <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-gray-900"><TIcon size={14} className="shrink-0 text-red-500" />{leave.leaveType}</p>
-                            {leave.reason && <p className="truncate text-xs text-gray-400" title={leave.reason}>“{leave.reason}”</p>}
+                            {leave.compOffFor
+                              ? <p className="truncate text-xs font-semibold text-sky-600">Worked on {shortDate(leave.compOffFor)}</p>
+                              : leave.reason && <p className="truncate text-xs text-gray-400" title={leave.reason}>“{leave.reason}”</p>}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3.5">
                             <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">
@@ -507,8 +521,8 @@ const TeamRequests = () => {
               </div>
 
               {/* PAGINATION */}
-              <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+              <div className="flex flex-col gap-3 border-t border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 sm:px-6">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-gray-500 sm:justify-start">
                   <span>Showing <b className="text-gray-900">{start + 1}–{Math.min(start + itemsPerPage, filteredLeaves.length)}</b> of <b className="text-gray-900">{filteredLeaves.length}</b></span>
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-400">Per page</span>
@@ -519,7 +533,7 @@ const TeamRequests = () => {
                   </div>
                 </div>
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1} aria-label="Previous page"
                       className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronLeft size={16} /></button>
                     {pageList(totalPages, currentPage).map((p, i) =>

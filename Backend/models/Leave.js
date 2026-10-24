@@ -34,6 +34,8 @@ const leaveSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
+    // Comp Off only: the weekend/holiday the employee worked to earn this day off (UTC midnight).
+    compOffFor: { type: Date, default: null },
     /* ===== Audit fields (additive) ===== */
     reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     reviewedAt: { type: Date, default: null },

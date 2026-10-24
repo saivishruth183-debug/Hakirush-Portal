@@ -86,8 +86,8 @@ const CopyEmail = ({ email }) => {
   const [copied, setCopied] = useState(false);
   if (!email) return <span className="text-sm text-gray-300">—</span>;
   return (
-    <div className="group/mail flex min-w-0 items-center gap-1.5">
-      <a href={`mailto:${email}`} className="truncate text-sm text-gray-600 transition hover:text-red-600">
+    <div className="group/mail flex w-full min-w-0 items-center gap-1.5">
+      <a href={`mailto:${email}`} title={email} className="min-w-0 flex-1 truncate text-sm text-gray-600 transition hover:text-red-600">
         {email}
       </a>
       <button
@@ -112,18 +112,18 @@ const StatCard = ({ icon: Icon, label, value, tone, i, active, onClick }) => (
     whileHover={onClick ? { y: -3 } : undefined}
     onClick={onClick}
     disabled={!onClick}
-    className={`group relative overflow-hidden rounded-3xl p-5 text-left transition disabled:cursor-default ${
+    className={`group relative min-w-0 overflow-hidden rounded-2xl p-3 text-left transition disabled:cursor-default sm:rounded-3xl sm:p-5 ${
       active ? "bg-white shadow-lg ring-2 ring-red-300" : "bg-white/85 shadow-[0_10px_30px_-14px_rgba(127,29,29,0.18)] ring-1 ring-white/70 backdrop-blur-sm hover:bg-white"
     }`}
   >
     <div className={`pointer-events-none absolute -bottom-6 -right-6 opacity-[0.08] ${tone.text}`}>
       <Icon size={96} strokeWidth={1.5} />
     </div>
-    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.bg} ${tone.text}`}>
-      <Icon size={18} />
+    <div className={`flex h-8 w-8 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${tone.bg} ${tone.text}`}>
+      <Icon size={16} />
     </div>
-    <p className="mt-4 truncate text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">{value}</p>
-    <p className="mt-0.5 text-xs font-medium text-gray-500">{label}</p>
+    <p className="mt-2 truncate text-xl font-extrabold tracking-tight text-gray-900 sm:mt-4 sm:text-3xl">{value}</p>
+    <p className="mt-0.5 truncate text-[11px] font-medium text-gray-500 sm:text-xs">{label}</p>
   </motion.button>
 );
 
@@ -248,8 +248,8 @@ const DepartmentEmployees = () => {
   const editDepartment = () => navigate(`/admin-dashboard/department/${id}`);
 
   return (
-    <div className={`min-h-screen pb-20 font-sans text-gray-700 ${PAGE_BG}`}>
-      <div className="mx-auto max-w-[1200px] space-y-6 p-4 sm:p-8">
+    <div className={`min-h-screen overflow-x-hidden pb-20 font-sans text-gray-700 ${PAGE_BG}`}>
+      <div className="mx-auto w-full max-w-[1200px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
         {/* ================= TOP ROW ================= */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="flex items-center justify-between gap-3 pt-2">
           <button
@@ -257,7 +257,7 @@ const DepartmentEmployees = () => {
             className="group inline-flex items-center gap-2 rounded-2xl bg-white/80 px-3.5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm ring-1 ring-red-100 transition hover:text-red-600 hover:ring-red-200"
           >
             <ChevronLeft size={17} className="transition-transform group-hover:-translate-x-0.5" />
-            Back to departments
+            <span className="sm:hidden">Back</span><span className="hidden sm:inline">Back to departments</span>
           </button>
           <span className="hidden items-center gap-1.5 text-xs font-medium text-gray-400 sm:flex">
             Departments <ChevronRight size={12} />
@@ -276,14 +276,14 @@ const DepartmentEmployees = () => {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">Team roster</p>
-              <h1 className="truncate text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
+              <h1 className="break-words text-2xl font-extrabold leading-tight tracking-tight text-gray-900 sm:truncate sm:text-3xl">
                 {departmentName || "Department"} <span className="text-red-600">team</span>
               </h1>
               <p className="mt-0.5 text-sm text-gray-500">Everyone currently assigned to this department.</p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <button
               onClick={() => setReloadKey((k) => k + 1)}
               disabled={loading}
@@ -315,7 +315,7 @@ const DepartmentEmployees = () => {
             {/* manager spotlight */}
             <motion.div
               initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.08 }}
-              className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-[0_20px_50px_-15px_rgba(220,38,38,0.45)] lg:col-span-5"
+              className="relative min-w-0 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white sm:p-5 shadow-[0_20px_50px_-15px_rgba(220,38,38,0.45)] lg:col-span-5"
             >
               <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
               <div className="pointer-events-none absolute -bottom-14 left-10 h-36 w-36 rounded-full bg-orange-300/25 blur-2xl" />
@@ -323,27 +323,27 @@ const DepartmentEmployees = () => {
                 <Crown size={13} /> Department manager
               </p>
               {manager ? (
-                <div className="relative flex items-center gap-4">
-                  <span className="rounded-[1.1rem] bg-white/30 p-[3px]">
+                <div className="relative flex min-w-0 items-center gap-4">
+                  <span className="shrink-0 rounded-[1.1rem] bg-white/30 p-[3px]">
                     <Avatar emp={manager} size="h-16 w-16" text="text-xl" />
                   </span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-xl font-extrabold leading-tight">{nameOf(manager)}</p>
                     <p className="truncate text-sm text-white/85">{manager.designation || "Manager"}</p>
                     {manager.userId?.email && (
-                      <a href={`mailto:${manager.userId.email}`} className="mt-1.5 inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold backdrop-blur transition hover:bg-white/30">
-                        <Mail size={11} /> <span className="truncate">{manager.userId.email}</span>
+                      <a href={`mailto:${manager.userId.email}`} className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold backdrop-blur transition hover:bg-white/30">
+                        <Mail size={11} className="shrink-0" /> <span className="min-w-0 truncate">{manager.userId.email}</span>
                       </a>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="relative flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
+                <div className="relative flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur">
                       <UserX size={24} />
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-lg font-extrabold">No manager yet</p>
                       <p className="text-sm text-white/80">
                         {employees.length ? "Pick one of this team's members." : "Add employees first, then choose one."}
@@ -360,7 +360,7 @@ const DepartmentEmployees = () => {
             </motion.div>
 
             {/* stats */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:col-span-7">
+            <div className="grid min-w-0 grid-cols-3 gap-2 sm:gap-4 lg:col-span-7">
               <StatCard i={0} icon={Users} label="Team members" value={stats.total} tone={{ bg: "bg-red-50", text: "text-red-600" }}
                 active={filter === "all"} onClick={() => setFilter("all")} />
               <StatCard i={1} icon={UserCheck} label="Active" value={stats.active} tone={{ bg: "bg-emerald-50", text: "text-emerald-600" }}
@@ -380,7 +380,7 @@ const DepartmentEmployees = () => {
           {!error && (
             <div className="space-y-3 border-b border-red-50 p-4 sm:p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                <label className="relative flex-1">
+                <label className="relative min-w-0 flex-1">
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -402,6 +402,7 @@ const DepartmentEmployees = () => {
                     value={sort}
                     onChange={(e) => setSort(e.target.value)}
                     className="w-full cursor-pointer appearance-none rounded-2xl bg-gray-50 py-3 pl-9 pr-9 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-red-300 md:w-auto"
+                    aria-label="Sort by"
                   >
                     {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
@@ -477,16 +478,16 @@ const DepartmentEmployees = () => {
           ) : (
             <>
               {/* ---------- MOBILE CARDS ---------- */}
-              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
                 {paginated.map((emp, i) => (
                   <motion.div
                     key={emp._id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: i * 0.04 } }}
-                    className={`overflow-hidden rounded-3xl bg-white ring-1 ${emp.isManager ? "ring-amber-200" : "ring-gray-100"} ${isInactive(emp) ? "opacity-75" : ""}`}
+                    className={`min-w-0 overflow-hidden rounded-3xl bg-white ring-1 ${emp.isManager ? "ring-amber-200" : "ring-gray-100"} ${isInactive(emp) ? "opacity-75" : ""}`}
                   >
                     <div className={`h-1.5 bg-gradient-to-r ${emp.isManager ? "from-amber-400 to-orange-400" : isInactive(emp) ? "from-gray-200 to-gray-300" : colorFor(nameOf(emp))}`} />
-                    <div className="p-4">
+                    <div className="p-3.5 sm:p-4">
                       <div className="flex items-start gap-3">
                         <Avatar emp={emp} size="h-12 w-12" />
                         <div className="min-w-0 flex-1">
@@ -497,10 +498,10 @@ const DepartmentEmployees = () => {
                             <StatusPill inactive={isInactive(emp)} />
                           </div>
                         </div>
-                        <span className="font-mono text-[11px] font-bold text-gray-300">#{String(startIndex + i + 1).padStart(2, "0")}</span>
+                        <span className="shrink-0 font-mono text-[11px] font-bold text-gray-300">#{String(startIndex + i + 1).padStart(2, "0")}</span>
                       </div>
-                      <div className="mt-3 space-y-2 rounded-2xl bg-gray-50/80 p-3">
-                        <div className="flex items-center gap-2">
+                      <div className="mt-3 min-w-0 space-y-2 rounded-2xl bg-gray-50/80 p-3">
+                        <div className="flex min-w-0 items-center gap-2">
                           <Mail size={13} className="shrink-0 text-red-500" />
                           <CopyEmail email={emp.userId?.email} />
                         </div>
@@ -515,7 +516,7 @@ const DepartmentEmployees = () => {
               </div>
 
               {/* ---------- DESKTOP TABLE ---------- */}
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <div className="grid grid-cols-[56px_minmax(0,1.4fr)_120px_minmax(0,1.4fr)_minmax(0,1fr)_110px] items-center gap-3 bg-gray-50/70 px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                   <span>#</span>
                   <span>Employee</span>
@@ -576,7 +577,7 @@ const DepartmentEmployees = () => {
               <p className="text-center text-xs text-gray-500 sm:text-left">
                 Showing <b className="text-gray-900">{showingFrom}–{showingTo}</b> of <b className="text-gray-900">{filtered.length}</b>
               </p>
-              <div className="flex items-center justify-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                   disabled={safePage === 1}

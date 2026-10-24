@@ -75,7 +75,7 @@ const QUICK_REMARKS = {
   Rejected: ["No supporting record", "Please raise with your manager", "Request is outside the allowed window"],
 };
 
-const AdminAttendanceRequests = () => {
+const AdminAttendanceRequests = ({ teamMode = false }) => {
   const [requests, setRequests] = useState([]);
   const [tab, setTab] = useState("Pending");
   const [search, setSearch] = useState("");
@@ -93,8 +93,11 @@ const AdminAttendanceRequests = () => {
   const fetchRequests = async (status) => {
     try {
       setLoading(true);
-      const params = status && status !== "All" ? { status } : {};
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance-request`, {
+      const params = teamMode
+        ? { status: status || "Pending" }
+        : status && status !== "All" ? { status } : {};
+      const endpoint = teamMode ? "/api/attendance-request/team" : "/api/attendance-request";
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}${endpoint}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         params,
       });
@@ -195,7 +198,7 @@ const AdminAttendanceRequests = () => {
     );
 
   return (
-    <div className={`min-h-screen ${PAGE_BG} pb-20 text-gray-900`}>
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG} pb-20 text-gray-900`}>
       {/* Toast */}
       {createPortal(
         <AnimatePresence>
@@ -211,7 +214,7 @@ const AdminAttendanceRequests = () => {
         document.body
       )}
 
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
 
         {/* HEADER */}
         <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -219,9 +222,9 @@ const AdminAttendanceRequests = () => {
             className="group mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200">
             <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" /> Back
           </button>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="relative flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
                 <MessageSquareText size={24} />
                 {tab !== "All" && pendingCount > 0 && (
                   <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-amber-950 ring-2 ring-white">
@@ -229,19 +232,20 @@ const AdminAttendanceRequests = () => {
                   </span>
                 )}
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Attendance</p>
-                <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Attendance {teamMode ? "· Team" : ""}</p>
+                <h1 className="text-xl font-extrabold leading-tight tracking-tight sm:text-3xl">
                   Correction <span className="bg-gradient-to-r from-red-600 to-rose-500 bg-clip-text text-transparent">Requests</span>
                 </h1>
                 <p className="text-sm text-gray-500">
-                  {pendingCount > 0 ? <><b className="text-amber-600">{pendingCount}</b> awaiting your review</> : "Review employees' attendance corrections"}
+                  {pendingCount > 0 ? <><b className="text-amber-600">{pendingCount}</b> awaiting your review</> : teamMode ? "Review your team's attendance corrections" : "Review employees' attendance corrections"}
                 </p>
               </div>
             </div>
             <button type="button" onClick={() => fetchRequests(tab)} disabled={loading}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-60 sm:self-auto">
-              <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
+              aria-label="Refresh" title="Refresh"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-60 sm:w-auto sm:px-4">
+              <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> <span className="hidden sm:inline">Refresh</span>
             </button>
           </div>
         </motion.header>
@@ -249,25 +253,25 @@ const AdminAttendanceRequests = () => {
         {/* MAIN CARD */}
         <div className={`${CARD} overflow-hidden`}>
           {/* Tabs + search */}
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:p-5 lg:flex-row lg:items-center">
-            <div className="flex gap-1 rounded-2xl bg-gray-100/80 p-1" role="tablist">
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-3 sm:p-5 lg:flex-row lg:items-center">
+            <div className="grid grid-cols-4 gap-1 rounded-2xl bg-gray-100/80 p-1 sm:flex" role="tablist">
               {TABS.map((t) => {
                 const Icon = TAB_ICON[t];
                 const active = tab === t;
                 return (
                   <button key={t} role="tab" aria-selected={active} onClick={() => setTab(t)}
-                    className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition-colors sm:flex-none sm:px-4 ${active ? "text-red-600" : "text-gray-500 hover:text-gray-800"}`}>
+                    className={`relative flex min-w-0 items-center justify-center gap-1 rounded-xl px-1 py-2 text-[12px] font-semibold transition-colors sm:flex-none sm:gap-1.5 sm:px-4 sm:text-sm ${active ? "text-red-600" : "text-gray-500 hover:text-gray-800"}`}>
                     {active && <motion.span layoutId="req-tab" className="absolute inset-0 rounded-xl bg-white shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
-                    <Icon size={15} className="relative" />
-                    <span className="relative">{t}</span>
+                    <Icon size={15} className="relative hidden shrink-0 sm:block" />
+                    <span className="relative truncate">{t}</span>
                     {t === "Pending" && tab === "Pending" && pendingCount > 0 && (
-                      <span className="relative rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700">{pendingCount}</span>
+                      <span className="relative hidden rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-700 sm:inline">{pendingCount}</span>
                     )}
                   </button>
                 );
               })}
             </div>
-            <div className="group relative flex flex-1 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
+            <div className="group relative flex min-w-0 flex-1 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
               <Search size={17} className="text-gray-400 transition group-focus-within:text-red-500" />
               <input
                 value={search}
@@ -301,7 +305,7 @@ const AdminAttendanceRequests = () => {
                 <table className="w-full table-auto border-collapse text-left">
                   <thead>
                     <tr className="bg-gray-50/70 text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                      <th className="py-3 pl-5 pr-3 font-bold lg:pl-6">Employee</th>
+                      <th className="w-[15rem] py-3 pl-5 pr-3 font-bold lg:pl-6">Employee</th>
                       <th className="px-3 py-3 font-bold">Date</th>
                       <th className="px-3 py-3 font-bold">Change</th>
                       <th className="px-3 py-3 font-bold">Reason</th>
@@ -320,7 +324,7 @@ const AdminAttendanceRequests = () => {
                         <motion.tr key={r._id}
                           initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 10) * 0.03 }}
                           className="group align-top transition-colors hover:bg-red-50/40">
-                          <td className="relative max-w-0 py-4 pl-5 pr-3 lg:pl-6">
+                          <td className="relative w-[15rem] max-w-[15rem] py-4 pl-5 pr-3 lg:pl-6">
                             <span className={`absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full ${st.bar}`} />
                             <div className="flex items-center gap-3">
                               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${colorFor(name)} text-xs font-bold text-white shadow-md`}>
@@ -371,14 +375,14 @@ const AdminAttendanceRequests = () => {
               </div>
 
               {/* MOBILE */}
-              <div className="space-y-3 p-4 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 md:hidden">
                 {paginated.length > 0 ? paginated.map((r, i) => {
                   const emp = r.employeeId;
                   const st = statusStyle[r.status] || statusStyle.Pending;
                   const name = emp?.userId?.name || "Unknown";
                   return (
                     <motion.div key={r._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.04 }}
-                      className="relative overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                      className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
                       <span className={`absolute inset-y-0 left-0 w-1.5 ${st.bar}`} />
                       <div className="flex items-start justify-between gap-3 pl-2">
                         <div className="flex min-w-0 items-center gap-3">
@@ -389,7 +393,7 @@ const AdminAttendanceRequests = () => {
                             <h3 className="truncate font-bold text-gray-900">{name}</h3>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               <span className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-500"><Hash size={9} />{emp?.employeeId || "N/A"}</span>
-                              <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} />{emp?.department?.dep_name || "N/A"}</span>
+                              <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} className="shrink-0" /><span className="truncate">{emp?.department?.dep_name || "N/A"}</span></span>
                             </div>
                           </div>
                         </div>
@@ -398,13 +402,20 @@ const AdminAttendanceRequests = () => {
                         </span>
                       </div>
                       <div className="mt-3 space-y-2 pl-2">
-                        <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                        <p className="flex flex-wrap items-center gap-x-1.5 text-xs font-semibold text-gray-600">
                           <CalendarDays size={13} className="text-gray-400" /> {formatDate(r.date)}
                           {r.createdAt && <span className="font-normal text-gray-400">· {ago(r.createdAt)}</span>}
                         </p>
                         <ChangePills from={r.currentStatus} to={r.requestedStatus} small />
                         {r.reason && (
-                          <p className="rounded-2xl bg-gray-50 p-3 text-sm text-gray-600 ring-1 ring-gray-100">{r.reason}</p>
+                          <div className="rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-100">
+                            <p className={`break-words text-[13px] leading-relaxed text-gray-600 ${expanded[r._id] ? "" : "line-clamp-3"}`}>{r.reason}</p>
+                            {r.reason.length > 110 && (
+                              <button onClick={() => setExpanded((e) => ({ ...e, [r._id]: !e[r._id] }))} className="mt-1 text-[11px] font-semibold text-red-600">
+                                {expanded[r._id] ? "Show less" : "Read more"}
+                              </button>
+                            )}
+                          </div>
                         )}
                         {r.remarks && r.status !== "Pending" && (
                           <p className="flex items-start gap-1 text-[11px] italic text-gray-400"><Quote size={10} className="mt-0.5 shrink-0" /> {r.remarks}</p>
@@ -422,11 +433,11 @@ const AdminAttendanceRequests = () => {
 
               {/* PAGINATION */}
               {totalPages > 1 && (
-                <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-4 sm:flex-row sm:justify-between sm:px-6">
+                <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-3 sm:flex-row sm:p-4 sm:justify-between sm:px-6">
                   <p className="text-xs text-gray-500">
                     Showing <b className="text-gray-900">{startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}</b> of <b className="text-gray-900">{filtered.length}</b>
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))} disabled={currentPage === 1} aria-label="Previous page"
                       className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-gray-200 transition enabled:hover:text-red-600 enabled:hover:ring-red-200 disabled:opacity-40">
                       <ChevronLeft size={16} />
@@ -491,7 +502,7 @@ const ReviewModal = ({ target, remarks, setRemarks, submitting, error, onClose, 
       <motion.div role="dialog" aria-modal="true"
         initial={{ y: 40, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 30, opacity: 0, scale: 0.97 }}
         transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100">
+        className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100">
         <div className={`h-1.5 ${approve ? "bg-gradient-to-r from-emerald-500 to-teal-400" : "bg-gradient-to-r from-red-600 to-rose-400"}`} />
         <button onClick={onClose} disabled={submitting} aria-label="Close"
           className="absolute right-4 top-5 rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-40">

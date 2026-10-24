@@ -28,6 +28,7 @@ const SNAPSHOT_FIELDS = [
   "isActive",
   "employeeId",
   "designation",
+  "gender",
   "employeeRecordId",
   "departmentId",
   "departmentName",

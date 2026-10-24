@@ -628,7 +628,7 @@ const EmployeeExpenses = () => {
   const fileKB = formData.receipt ? formData.receipt.size / 1024 : 0;
 
   return (
-    <div className={`min-h-screen ${PAGE_BG}`}>
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG}`}>
       {/* toast */}
       {createPortal(
         <AnimatePresence>
@@ -645,16 +645,16 @@ const EmployeeExpenses = () => {
         document.body
       )}
 
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
         {/* HEADER */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
               <Receipt size={26} />
             </div>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">My expenses</h1>
-              <p className="text-sm text-gray-500">Approved claims are added to your next payslip automatically.</p>
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">My expenses</h1>
+              <p className="text-xs text-gray-500 sm:text-sm">Approved claims are added to your next payslip automatically.</p>
             </div>
           </div>
           <button onClick={() => setIsModalOpen(true)}
@@ -664,9 +664,9 @@ const EmployeeExpenses = () => {
         </header>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-4">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            className="relative col-span-2 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-xl shadow-red-600/25 lg:col-span-1">
+            className="relative col-span-3 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white shadow-xl shadow-red-600/25 sm:p-5 lg:col-span-1">
             <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
             <p className="relative flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/80"><BadgeIndianRupee size={13} /> Coming in next payslip</p>
             <p className="relative mt-2 text-3xl font-extrabold tabular-nums">{loading ? "–" : inr(summary.totalApproved)}</p>
@@ -679,26 +679,26 @@ const EmployeeExpenses = () => {
           ].map((s, i) => (
             <motion.button type="button" key={s.label} onClick={() => setStatusTab(s.tab)}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
-              className={`${CARD} p-4 text-left transition hover:-translate-y-0.5 sm:p-5 ${statusTab === s.tab && s.tab !== "All" ? "ring-2 ring-red-300" : ""}`}>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.tone}`}><s.Icon size={17} /></div>
-              <p className="mt-3 truncate text-xl font-extrabold tabular-nums text-gray-900 sm:text-2xl">{loading ? "–" : s.value}</p>
-              <p className="text-xs font-semibold text-gray-500">{s.label}</p>
-              <p className="text-[11px] text-gray-400">{s.sub}</p>
+              className={`${CARD} min-w-0 p-3 text-left transition hover:-translate-y-0.5 sm:p-5 ${statusTab === s.tab && s.tab !== "All" ? "ring-2 ring-red-300" : ""}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl sm:h-9 sm:w-9 ${s.tone}`}><s.Icon size={16} /></div>
+              <p className="mt-2 truncate text-base font-extrabold tabular-nums text-gray-900 sm:mt-3 sm:text-2xl" title={s.value}>{loading ? "–" : s.value}</p>
+              <p className="truncate text-[11px] font-semibold text-gray-500 sm:text-xs">{s.label === "Waiting for review" ? <><span className="sm:hidden">Pending</span><span className="hidden sm:inline">{s.label}</span></> : s.label}</p>
+              <p className="hidden truncate text-[11px] text-gray-400 sm:block">{s.sub}</p>
             </motion.button>
           ))}
         </div>
 
         {/* LIST */}
         <div className={`${CARD} overflow-hidden`}>
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="-mx-1 overflow-x-auto px-1">
-              <div className="flex w-max gap-1 rounded-2xl bg-gray-100/80 p-1">
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-3 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="grid grid-cols-3 gap-1 rounded-2xl bg-gray-100/80 p-1 sm:flex sm:w-max">
                 {STATUSES.map((st) => (
                   <button key={st} onClick={() => setStatusTab(st)}
-                    className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition ${statusTab === st ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
+                    className={`relative flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2 text-[12px] font-semibold transition sm:gap-1.5 sm:px-3.5 sm:text-sm ${statusTab === st ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
                     {statusTab === st && <motion.span layoutId="myexp-tab" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow-md shadow-red-600/25" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
-                    <span className="relative">{st}</span>
-                    <span className={`relative rounded-full px-1.5 text-[11px] font-bold ${statusTab === st ? "bg-white/25" : "bg-white text-gray-500"}`}>{counts[st]}</span>
+                    <span className="relative truncate">{st}</span>
+                    <span className={`relative rounded-full px-1 text-[10px] font-bold sm:px-1.5 sm:text-[11px] ${statusTab === st ? "bg-white/25" : "bg-white text-gray-500"}`}>{counts[st]}</span>
                   </button>
                 ))}
               </div>
@@ -735,21 +735,21 @@ const EmployeeExpenses = () => {
           ) : (
             <>
               {/* MOBILE */}
-              <div className="space-y-3 p-4 lg:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
                 {visible.map((c) => {
                   const m = metaFor(c.status);
                   const CIcon = catIcon(c.category);
                   return (
                     <motion.div key={c._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      className="relative overflow-hidden rounded-2xl bg-white p-4 ring-1 ring-gray-100">
+                      className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3.5 ring-1 ring-gray-100">
                       <span className={`absolute inset-y-0 left-0 w-1 ${m.strip}`} />
                       <div className="flex items-start gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600"><CIcon size={18} /></span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold text-gray-900"><Highlight text={c.title} q={q} /></p>
-                          <p className="truncate text-xs text-gray-500">{c.category} · {fmtDate(c.date)}</p>
+                          <p className="text-xs leading-snug text-gray-500">{c.category} · <span className="whitespace-nowrap">{fmtDate(c.date)}</span></p>
                         </div>
-                        <p className="text-lg font-extrabold tabular-nums text-gray-900">{inr(c.amount)}</p>
+                        <p className="shrink-0 text-lg font-extrabold tabular-nums text-gray-900">{inr(c.amount)}</p>
                       </div>
                       {c.description && <p className="mt-2 line-clamp-2 text-xs text-gray-500">{c.description}</p>}
                       <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-50 pt-3">
@@ -816,7 +816,7 @@ const EmployeeExpenses = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="border-t border-gray-100 px-6 py-3 text-sm text-gray-500">
+              <div className="border-t border-gray-100 px-4 py-3 text-center text-sm text-gray-500 sm:px-6 sm:text-left">
                 {visible.length} claim{visible.length === 1 ? "" : "s"} · total <b className="text-gray-900">{inr(visible.reduce((s, c) => s + (c.amount || 0), 0))}</b>
               </div>
             </>
@@ -837,7 +837,7 @@ const EmployeeExpenses = () => {
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
-              <div className="space-y-5 overflow-y-auto p-6">
+              <div className="space-y-5 overflow-y-auto p-4 sm:p-6">
                 {error && (
                   <p className="flex items-start gap-2 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700 ring-1 ring-red-100">
                     <AlertTriangle size={14} className="mt-px shrink-0" />{error}

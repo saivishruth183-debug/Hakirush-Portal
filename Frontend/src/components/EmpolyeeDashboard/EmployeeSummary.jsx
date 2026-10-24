@@ -29,10 +29,31 @@ const DAY_STYLE = {
   halfday: { cell: "bg-amber-400 text-white shadow-md shadow-amber-400/30", dot: "bg-amber-400", label: "Half day" },
   absent: { cell: "bg-red-600 text-white shadow-md shadow-red-600/30", dot: "bg-red-600", label: "Absent" },
   working: { cell: "bg-sky-500 text-white shadow-md shadow-sky-500/30", dot: "bg-sky-500", label: "Working" },
-  leave: { cell: "bg-violet-500 text-white shadow-md shadow-violet-500/30", dot: "bg-violet-500", label: "Leave" },
+  leave: { cell: "bg-violet-500 text-white shadow-md shadow-violet-500/30", dot: "bg-violet-500", label: "Leave", short: "LV" },
+  /* one colour per leave type */
+  leave_cl: { cell: "bg-violet-500 text-white shadow-md shadow-violet-500/30", dot: "bg-violet-500", label: "Casual leave", short: "CL" },
+  leave_sl: { cell: "bg-orange-500 text-white shadow-md shadow-orange-500/30", dot: "bg-orange-500", label: "Sick leave", short: "SL" },
+  leave_co: { cell: "bg-blue-600 text-white shadow-md shadow-blue-600/30", dot: "bg-blue-600", label: "Comp-off", short: "CO" },
+  leave_pl: { cell: "bg-teal-600 text-white shadow-md shadow-teal-600/30", dot: "bg-teal-600", label: "Paternity leave", short: "PL" },
+  leave_ml: { cell: "bg-pink-500 text-white shadow-md shadow-pink-500/30", dot: "bg-pink-500", label: "Maternity leave", short: "ML" },
+  leave_lop: { cell: "bg-slate-700 text-white shadow-md shadow-slate-700/30", dot: "bg-slate-700", label: "Loss of pay", short: "LOP" },
   holiday: { cell: "bg-rose-50 text-rose-700 ring-1 ring-rose-200", dot: "bg-rose-300", label: "Holiday" },
   weekend: { cell: "bg-gray-50 text-gray-300", dot: "bg-gray-200", label: "Weekend" },
   none: { cell: "bg-white text-gray-700 ring-1 ring-gray-100 hover:ring-red-200", dot: "bg-white ring-1 ring-gray-200", label: "Working day" },
+};
+
+const LEAVE_KEYS = ["leave_cl", "leave_sl", "leave_co", "leave_pl", "leave_ml", "leave_lop"];
+const isLeaveStatus = (status = "") => String(status).startsWith("leave");
+/* Map a leave type name to its calendar colour key */
+const leaveKeyFor = (type = "") => {
+  const t = String(type).toLowerCase();
+  if (t.includes("casual")) return "leave_cl";
+  if (t.includes("sick") || t.includes("medical")) return "leave_sl";
+  if (t.includes("comp")) return "leave_co";
+  if (t.includes("paternity")) return "leave_pl";
+  if (t.includes("maternity")) return "leave_ml";
+  if (t.includes("loss of pay") || t === "lop") return "leave_lop";
+  return "leave";
 };
 
 const TEAM_INITIAL = {
@@ -314,7 +335,7 @@ const EmployeeSummary = () => {
       return date >= start && date <= end;
     });
 
-    if (activeLeave) return { status: "leave", title: activeLeave.leaveType };
+    if (activeLeave) return { status: leaveKeyFor(activeLeave.leaveType), title: activeLeave.leaveType };
 
     const attRec = attendance.find(a => toYMD(a.date) === dateStr);
     if (attRec) {
@@ -664,7 +685,8 @@ const EmployeeSummary = () => {
     const ds = toYMD(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), d));
     if (ds > todayStr) break;
     const { status } = getDayInfo(d);
-    if (status in monthStats) monthStats[status]++;
+    if (isLeaveStatus(status)) monthStats.leave++;
+    else if (status in monthStats) monthStats[status]++;
   }
   const countedDays = monthStats.present + monthStats.halfday + monthStats.absent;
   const attendanceRate = countedDays ? Math.round(((monthStats.present + monthStats.halfday * 0.5) / countedDays) * 100) : null;
@@ -924,6 +946,9 @@ const EmployeeSummary = () => {
                     <button key={i} type="button" onClick={() => handleDayClick(day)} title={title}
                       className={`relative flex aspect-square flex-col items-center justify-center rounded-xl p-1 transition hover:-translate-y-0.5 active:scale-95 sm:aspect-auto sm:min-h-[4.75rem] sm:rounded-2xl ${st.cell} ${isFuture && status === "none" ? "opacity-60" : ""} ${isToday ? "ring-2 ring-red-500 ring-offset-2" : ""}`}>
                       <span className="text-sm font-extrabold leading-none sm:text-lg">{day}</span>
+                      {isLeaveStatus(status) && st.short && (
+                        <span className="mt-0.5 text-[8px] font-extrabold leading-none tracking-wide opacity-90 sm:hidden">{st.short}</span>
+                      )}
                       {title && status !== "none" && status !== "weekend" && (
                         <span className="mt-1 hidden max-w-full truncate px-1 text-[10px] font-semibold leading-tight opacity-90 sm:block">{title}</span>
                       )}
@@ -937,9 +962,19 @@ const EmployeeSummary = () => {
             </AnimatePresence>
 
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 pt-4 text-[11px] font-semibold text-gray-500">
-              {["present", "halfday", "absent", "working", "leave", "holiday", "weekend"].map((k) => (
+              {["present", "halfday", "absent", "working", "holiday", "weekend"].map((k) => (
                 <span key={k} className="flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded ${DAY_STYLE[k].dot}`} />{DAY_STYLE[k].label}</span>
               ))}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {LEAVE_KEYS.map((k) => (
+                <span key={k} className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 py-0.5 pl-0.5 pr-2.5 text-[11px] font-semibold text-gray-600 ring-1 ring-gray-100">
+                  <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-extrabold text-white ${DAY_STYLE[k].dot}`}>{DAY_STYLE[k].short}</span>
+                  {DAY_STYLE[k].label}
+                </span>
+              ))}
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] font-semibold text-gray-500">
               <span className="flex items-center gap-1.5"><span className="flex h-3 w-3 items-center justify-center rounded-full bg-amber-400 text-white"><Clock3 size={7} strokeWidth={3} /></span>Correction pending</span>
             </div>
           </section>
@@ -1175,7 +1210,7 @@ const EmployeeSummary = () => {
         {/* ================= DAY DETAIL / CORRECTION ================= */}
         {sd && (
           <Modal key="day" onClose={() => setSelectedDay(null)}>
-            <div className={`relative shrink-0 px-6 pb-5 pt-7 ${["present", "halfday", "absent", "working", "leave"].includes(sd.status) ? sdStyle.cell.split(" ").filter((c) => c.startsWith("bg-") || c.startsWith("text-")).join(" ") : "bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 text-white"}`}>
+            <div className={`relative shrink-0 px-6 pb-5 pt-7 ${(["present", "halfday", "absent", "working"].includes(sd.status) || isLeaveStatus(sd.status)) ? sdStyle.cell.split(" ").filter((c) => c.startsWith("bg-") || c.startsWith("text-")).join(" ") : "bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 text-white"}`}>
               <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
               <button onClick={() => setSelectedDay(null)} aria-label="Close" className="absolute right-4 top-4 rounded-full bg-white/20 p-1.5 ring-1 ring-white/30 hover:bg-white/30"><X size={16} /></button>
               <p className="relative text-xs font-semibold uppercase tracking-wider opacity-80">
@@ -1251,7 +1286,7 @@ const EmployeeSummary = () => {
                 </div>
               ) : (
                 <p className="rounded-2xl bg-gray-50 p-3 text-center text-xs text-gray-400 ring-1 ring-gray-100">
-                  {sd.status === "holiday" ? "Company holiday — enjoy the day off." : sd.status === "weekend" ? "Weekend — no attendance needed." : sd.status === "leave" ? "You were on approved leave." : sd.status === "present" ? "Marked present. Nothing to correct." : "Corrections can be requested for absent or half days."}
+                  {sd.status === "holiday" ? "Company holiday — enjoy the day off." : sd.status === "weekend" ? "Weekend — no attendance needed." : isLeaveStatus(sd.status) ? `You were on approved ${sd.title || "leave"}${sd.status === "leave_lop" ? " (unpaid)" : ""}.` : sd.status === "present" ? "Marked present. Nothing to correct." : "Corrections can be requested for absent or half days."}
                 </p>
               )}
               {requestError && sdExisting && <p className="flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle size={12} />{requestError}</p>}

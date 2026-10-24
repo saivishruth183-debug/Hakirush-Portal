@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/authContext";
-import SessionUnavailable from "./SessionUnavailable";
+import SessionUnavailable, { SessionLoader } from "./SessionUnavailable";
 
 const ROLE_HOME = {
   admin: "/admin-dashboard",
@@ -14,7 +14,7 @@ const RootRedirect = () => {
 
   if (location.pathname !== "/") return null;
 
-  if (loading) return null;
+  if (loading) return <SessionLoader />;
 
   if (!user) {
     if (offline && localStorage.getItem("token")) return <SessionUnavailable />;

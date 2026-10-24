@@ -24,6 +24,8 @@ const refresh = (refreshToken) => request(app).post("/api/auth/mobile/refresh").
 
 describe("web login", () => {
   test("success returns {success, token, user: SessionUser}; JWT carries _id, role, tv", async () => {
+    fx.itDev1.employee.gender = "Female";
+    await fx.itDev1.employee.save();
     const r = await request(app).post("/api/auth/login").send({ email: "alan@test.local", password: PASSWORD });
     assert.equal(r.status, 200);
     assert.equal(r.body.success, true);
@@ -39,6 +41,7 @@ describe("web login", () => {
     assert.equal(u._id, String(fx.itDev1.user._id));
     assert.equal(u.employeeId, fx.itDev1.employee.employeeId);
     assert.equal(u.designation, "Developer");
+    assert.equal(u.gender, "Female");
     assert.equal(u.employeeRecordId, String(fx.itDev1.employee._id));
     assert.equal(u.departmentId, String(fx.departments.it._id));
     assert.equal(u.departmentName, "IT");

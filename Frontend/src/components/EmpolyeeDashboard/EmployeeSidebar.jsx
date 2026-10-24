@@ -43,6 +43,7 @@ const EmployeeSidebar = () => {
     { link: "/employee-dashboard/expenses", icon: Receipt, title: "Expenses", group: "Time & pay" },
     { link: `/employee-dashboard/payslips/${user?._id}`, icon: FileText, title: "Payslips", group: "Time & pay" },
     ...(user?.isManager ? [{ link: "/employee-dashboard/team-requests", icon: Users, title: "Team Requests", group: "Team" }] : []),
+    ...(user?.isManager ? [{ link: "/employee-dashboard/team-attendance-requests", icon: CalendarCheck, title: "Attendance Requests", group: "Team" }] : []),
     { link: "/employee-dashboard/setting", icon: Settings, title: "Settings", group: "Account" },
   ];
 

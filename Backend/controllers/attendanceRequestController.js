@@ -4,7 +4,7 @@ import Employee from "../models/Employee.js";
 import Department from "../models/Department.js";
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
-import { asyncHandler, badRequest, conflict, notFound } from "../middleware/errorHandler.js";
+import { asyncHandler, badRequest, conflict, forbidden, notFound } from "../middleware/errorHandler.js";
 import {
   requireObjectId,
   requireYmd,
@@ -107,6 +107,23 @@ const createAttendanceRequest = asyncHandler(async (req, res) => {
     throw err;
   }
 
+  const department = await Department.findById(employee.department).select("managerEmployeeId").lean();
+  if (department?.managerEmployeeId && String(department.managerEmployeeId) !== String(employee._id)) {
+    const manager = await Employee.findById(department.managerEmployeeId).select("userId").lean();
+    if (manager?.userId) {
+      await Notification.create({
+        type: "attendance-request",
+        message: `${req.user.name || "An employee"} submitted an attendance correction request for ${date}`,
+        data: {
+          requestId: request._id,
+          employeeId: employee._id,
+          adminId: manager.userId,
+          link: "/employee-dashboard/team-attendance-requests",
+        },
+      });
+    }
+  }
+
   const admins = await User.find({ role: "admin", isActive: { $ne: false } }).select("_id");
   if (admins.length > 0) {
     const notifications = admins.map((admin) => ({
@@ -164,6 +181,36 @@ const getAllAttendanceRequests = asyncHandler(async (req, res) => {
   return res.json({ success: true, requests });
 });
 
+/* ================= MANAGER: TEAM REQUESTS ================= */
+const getTeamAttendanceRequests = asyncHandler(async (req, res) => {
+  const manager = await getEmployeeForUser(req.user._id);
+  const department = await Department.findOne({ managerEmployeeId: manager._id }).lean();
+  if (!department) return res.json({ success: true, requests: [] });
+
+  const { status, page, limit } = req.query;
+  const filter = { employeeId: { $in: await Employee.find({
+    department: department._id,
+    _id: { $ne: manager._id },
+  }).distinct("_id") } };
+  if (status !== undefined && status !== "" && status !== "All") {
+    filter.status = requireEnum(status, REQUEST_STATUSES, "status");
+  } else if (status === undefined || status === "") {
+    filter.status = "Pending";
+  }
+
+  const query = AttendanceRequest.find(filter).populate(EMPLOYEE_POPULATE).sort({ createdAt: -1 });
+  if (page !== undefined || limit !== undefined) {
+    const p = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+    const [requests, total] = await Promise.all([
+      query.skip(p.skip).limit(p.limit),
+      AttendanceRequest.countDocuments(filter),
+    ]);
+    return res.json({ success: true, requests, page: p.page, limit: p.limit, total, hasMore: p.skip + requests.length < total });
+  }
+  const requests = await query.limit(500);
+  return res.json({ success: true, requests });
+});
+
 /* ================= ADMIN: REVIEW REQUEST ================= */
 const applyApprovedCorrection = async (request, reviewer, now) => {
   const existing = await Attendance.findOne({ employeeId: request.employeeId, date: request.date }).lean();
@@ -204,10 +251,28 @@ const reviewAttendanceRequest = asyncHandler(async (req, res) => {
   const decision = requireEnum(req.body?.decision, DECISIONS, "decision");
   const remarks = trimmedString(req.body?.remarks, "remarks", { max: REASON_MAX, optional: true }) || "";
   const now = clockNow();
+  let scope = {};
+
+  if (req.user.role !== "admin") {
+    const manager = await getEmployeeForUser(req.user._id);
+    const department = await Department.findOne({ managerEmployeeId: manager._id }).lean();
+    if (!department) throw forbidden("Only a department manager can review attendance requests");
+
+    const employeeIds = await Employee.find({
+      department: department._id,
+      _id: { $ne: manager._id },
+    }).distinct("_id");
+    const target = await AttendanceRequest.findById(requestId).select("employeeId").lean();
+    if (!target) throw notFound("Request not found");
+    if (!employeeIds.some((id) => String(id) === String(target.employeeId))) {
+      throw forbidden("You can only review requests from your department");
+    }
+    scope = { employeeId: { $in: employeeIds } };
+  }
 
   // Atomic Pending -> Approved/Rejected: only one review can win.
   const request = await AttendanceRequest.findOneAndUpdate(
-    { _id: requestId, status: "Pending" },
+    { _id: requestId, status: "Pending", ...scope },
     { $set: { status: decision, reviewedBy: req.user._id, reviewRemarks: remarks, reviewedAt: now } },
     { returnDocument: "after" }
   );
@@ -267,6 +332,7 @@ export {
   createAttendanceRequest,
   getMyAttendanceRequests,
   getAllAttendanceRequests,
+  getTeamAttendanceRequests,
   deleteAttendanceRequest,
   reviewAttendanceRequest,
 };

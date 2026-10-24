@@ -137,11 +137,11 @@ const LoadingSkeleton = () => (
 
 const CardHeader = ({ icon: Icon, title, sub, color = C.brand, right }) => (
   <div className="mb-5 flex items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl" style={{ background: `${color}14`, color }}>
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ background: `${color}14`, color }}>
         <Icon size={18} />
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-[15px] font-bold text-gray-900">{title}</p>
         {sub && <p className="text-xs text-gray-400">{sub}</p>}
       </div>
@@ -164,32 +164,33 @@ const Kpi = ({ icon: Icon, label, value, total, color, bg, i = 0 }) => {
   return (
     <motion.div
       initial="hidden" animate="show" custom={i} variants={rise}
-      whileHover={{ y: -4 }}
-      className="group relative overflow-hidden rounded-3xl p-5 sm:p-6" style={{ background: bg }}
+      whileHover={{ y: -3 }}
+      className="relative min-w-0 overflow-hidden rounded-3xl bg-white/90 p-4 shadow-[0_1px_3px_rgba(17,24,39,0.04),0_10px_30px_-12px_rgba(127,29,29,0.12)] ring-1 ring-white/70 backdrop-blur-sm sm:p-5"
     >
-      <div className="pointer-events-none absolute -right-6 -bottom-6 opacity-[0.12] transition-transform duration-500 group-hover:scale-110" style={{ color }}>
-        <Icon size={110} strokeWidth={1.5} />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm" style={{ color }}>
-          <Icon size={20} />
+      <span className="absolute inset-x-0 top-0 h-1" style={{ background: color }} />
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10" style={{ background: bg, color }}>
+          <Icon size={18} />
         </div>
+        <p className="min-w-0 truncate text-[13px] font-semibold text-gray-600 sm:text-sm">{label}</p>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-2 sm:mt-4">
+        <p className="text-3xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums sm:text-4xl"><Num value={value} /></p>
         {total > 0 && (
-          <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-bold tabular-nums shadow-sm" style={{ color }}>
+          <span className="mb-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums" style={{ background: bg, color }}>
             {share}%
           </span>
         )}
       </div>
-      <p className="mt-6 text-4xl font-extrabold tracking-tight text-gray-900 tabular-nums"><Num value={value} /></p>
-      <p className="mt-1 text-sm font-medium text-gray-600">{label}</p>
       {total > 0 && (
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 sm:mt-4">
           <motion.div
             initial={{ width: 0 }} animate={{ width: `${share}%` }} transition={{ duration: 1, delay: 0.2 + i * 0.06, ease: "easeOut" }}
             className="h-full rounded-full" style={{ background: color }}
           />
         </div>
       )}
+      <p className="mt-1.5 text-[11px] text-gray-400">{total > 0 ? `of ${total} people` : "No data yet"}</p>
     </motion.div>
   );
 };
@@ -385,19 +386,19 @@ const AdminSummary = () => {
   if (insights.length === 0) insights.push({ tone: "good", text: "Everything looks calm today. Nothing needs your attention." });
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] pb-16 font-sans text-gray-700 selection:bg-red-200/60">
-      <div className="mx-auto max-w-[1440px] space-y-6 px-4 pt-6 sm:px-8 sm:pt-8">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(ellipse_at_top_left,_#fee2e2_0%,_#f8fafc_45%,_#f1f5f9_100%)] pb-16 font-sans text-gray-700 selection:bg-red-200/60">
+      <div className="mx-auto w-full max-w-[1440px] space-y-5 px-3 pt-5 sm:space-y-6 sm:px-8 sm:pt-8">
         {/* ================= TOP ROW ================= */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-medium text-gray-400">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-gray-400 sm:text-sm">
               {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
-            <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Admin <span className="text-red-600">Dashboard</span></h1>
+            <h1 className="truncate text-xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Admin <span className="text-red-600">Dashboard</span></h1>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold ${
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`hidden items-center gap-2 rounded-full px-3.5 py-2 text-xs font-semibold sm:inline-flex ${
               att?.isHoliday ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
             }`}>
               <span className="relative flex h-2 w-2">
@@ -540,76 +541,76 @@ const AdminSummary = () => {
         </div>
 
         {/* ================= WELCOME BANNER + ACTIONS ================= */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-12">
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-6 text-white shadow-[0_20px_50px_-15px_rgba(220,38,38,0.45)] sm:p-8 lg:col-span-8"
+            className="relative flex min-w-0 flex-col justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-red-600 to-rose-500 p-5 text-white shadow-[0_20px_50px_-20px_rgba(220,38,38,0.55)] sm:p-8 lg:col-span-8"
           >
-            <motion.div
-              className="pointer-events-none absolute -top-16 -right-10 h-56 w-56 rounded-full bg-white/15 blur-2xl"
-              animate={{ x: [0, -20, 0], y: [0, 15, 0] }} transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-orange-300/25 blur-3xl" />
-            <div className="pointer-events-none absolute right-8 bottom-6 hidden h-24 w-24 rounded-full border-[14px] border-white/10 md:block" />
+            <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-24 right-24 h-48 w-48 rounded-full bg-white/[0.07]" />
 
-            <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-4">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur">
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-8">
+              <div className="min-w-0 flex-1">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
                   <DayIcon size={14} /> {hello}
                 </span>
-                <h2 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
-                  Welcome back, {firstName}! 👋
+                <h2 className="mt-3 break-words text-2xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+                  Welcome back, {firstName} 👋
                 </h2>
-                <p className="max-w-md text-sm text-white/85">
-                  {present + half} of {base} people are in today
+                <p className="mt-2 max-w-md text-sm leading-relaxed text-white/85">
+                  <b className="font-bold text-white">{present + half}</b> of {base} people are in today
                   {unmarked > 0 ? `, and ${unmarked} haven't been marked yet` : ""}.
                   {pendingLeaves > 0 ? ` ${pendingLeaves} leave request${pendingLeaves > 1 ? "s are" : " is"} waiting for you.` : " No leave requests are waiting."}
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   <button
                     onClick={() => navigate("/admin-dashboard/leaves")}
-                    className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-red-600 shadow-lg shadow-red-900/20 transition hover:-translate-y-0.5"
+                    className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3 py-2.5 text-sm font-bold text-red-600 sm:gap-2 sm:px-4 shadow-md shadow-red-900/20 transition hover:-translate-y-0.5"
                   >
                     Review leaves <ArrowUpRight size={15} />
                   </button>
                   <button
                     onClick={exportCSV}
                     disabled={exporting}
-                    className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-white/30 backdrop-blur transition hover:bg-white/25 disabled:opacity-70"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-white/15 px-3 py-2.5 sm:px-4 text-sm font-semibold text-white ring-1 ring-white/30 transition hover:bg-white/25 disabled:opacity-70"
                   >
                     {exporting ? <RefreshCw size={15} className="animate-spin" /> : <Download size={15} />}
-                    {exporting ? "Preparing…" : "Export report"}
+                    {exporting ? "Preparing…" : "Export"}
                   </button>
                 </div>
               </div>
 
-              {/* Attendance gauge */}
-              <div className="mx-auto flex shrink-0 flex-col items-center rounded-3xl bg-white/15 p-5 ring-1 ring-white/25 backdrop-blur md:mx-0">
-                <div className="relative h-32 w-32">
+              {/* Attendance gauge — side by side with its legend on phones */}
+              <div className="flex shrink-0 items-center gap-5 rounded-3xl bg-white/10 p-4 ring-1 ring-white/20 md:flex-col md:gap-3 md:p-5">
+                <div className="relative h-24 w-24 shrink-0 sm:h-28 sm:w-28">
                   <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="11" />
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="10" />
                     <circle
-                      cx="60" cy="60" r="50" fill="none" stroke="#fff" strokeWidth="11" strokeLinecap="round"
+                      cx="60" cy="60" r="50" fill="none" stroke="#fff" strokeWidth="10" strokeLinecap="round"
                       strokeDasharray={2 * Math.PI * 50} strokeDashoffset={2 * Math.PI * 50 * (1 - rate / 100)}
                       style={{ transition: "stroke-dashoffset 1.2s ease" }}
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-extrabold tabular-nums"><Num value={rate} suffix="%" /></span>
+                    <span className="text-2xl font-extrabold leading-none tabular-nums sm:text-[28px]"><Num value={rate} suffix="%" /></span>
+                    <span className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-white/75">in today</span>
                   </div>
                 </div>
-                <p className="mt-2 text-xs font-semibold text-white/85">Attendance today</p>
-                <div className="mt-3 flex h-1.5 w-32 overflow-hidden rounded-full bg-white/25">
-                  {[[present, "#ffffff"], [half, "#fde68a"], [leave, "#bae6fd"], [absent, "#fecdd3"]].map(([v, c], idx) =>
-                    v ? <div key={idx} className="h-full" style={{ width: `${pct(v, base)}%`, background: c }} /> : null
-                  )}
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 md:w-full md:grid-cols-2 md:gap-x-4">
+                  {[["Present", present, "#ffffff"], ["Half day", half, "#fde68a"], ["On leave", leave, "#bae6fd"], ["Absent", absent, "#fecdd3"]].map(([l, v, c]) => (
+                    <div key={l} className="flex items-center gap-2 text-xs font-medium text-white/85">
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c }} />
+                      <span className="truncate">{l}</span>
+                      <b className="ml-auto pl-2 tabular-nums text-white">{v}</b>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </motion.div>
 
           {/* To-do list */}
-          <Card i={1} className="flex flex-col p-6 lg:col-span-4">
+          <Card i={1} className="flex flex-col p-5 sm:p-6 lg:col-span-4">
             <CardHeader icon={AlertCircle} title="To do" sub="Waiting for your action" color={C.amber} />
             <div className="flex-1 space-y-3">
               <TodoRow icon={CalendarClock} label="Leave requests" count={pendingLeaves} color={C.amber} onClick={() => navigate("/admin-dashboard/leaves")} />
@@ -620,15 +621,15 @@ const AdminSummary = () => {
         </div>
 
         {/* ================= PASTEL KPIs ================= */}
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-          <Kpi i={0} icon={Activity} label="Present today" value={present} total={base} color={C.emerald} bg="linear-gradient(135deg,#ecfdf5,#d1fae5)" />
-          <Kpi i={1} icon={Clock} label="Half day" value={half} total={base} color={C.amber} bg="linear-gradient(135deg,#fffbeb,#fef3c7)" />
-          <Kpi i={2} icon={UserMinus} label="On leave" value={leave} total={base} color={C.sky} bg="linear-gradient(135deg,#f0f9ff,#e0f2fe)" />
-          <Kpi i={3} icon={AlertCircle} label="Absent" value={absent} total={base} color={C.rose} bg="linear-gradient(135deg,#fff1f2,#ffe4e6)" />
+        <div className="grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
+          <Kpi i={0} icon={Activity} label="Present today" value={present} total={base} color={C.emerald} bg="#ecfdf5" />
+          <Kpi i={1} icon={Clock} label="Half day" value={half} total={base} color={C.amber} bg="#fffbeb" />
+          <Kpi i={2} icon={UserMinus} label="On leave" value={leave} total={base} color={C.sky} bg="#f0f9ff" />
+          <Kpi i={3} icon={AlertCircle} label="Absent" value={absent} total={base} color={C.rose} bg="#fff1f2" />
         </div>
 
         {/* ================= INSIGHTS ================= */}
-        <Card className="p-6">
+        <Card className="p-5 sm:p-6">
           <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-amber-100/60 blur-2xl" />
           <CardHeader icon={Lightbulb} title="Today's insights" sub="Worked out automatically from your data" color={C.amber} />
           <div className="relative grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -664,7 +665,7 @@ const AdminSummary = () => {
           ].map(([Icon, label, val, color, hint], idx) => {
             const isEmployeeCard = label === "Active employees";
             const card = (
-              <Card i={idx} className="group flex items-center gap-5 p-6 transition-transform duration-300 hover:-translate-y-1">
+              <Card i={idx} className="group flex items-center gap-4 p-5 sm:gap-5 sm:p-6 transition-transform duration-300 hover:-translate-y-1">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)`, boxShadow: `0 10px 24px -8px ${color}80` }}>
                   <Icon size={24} />
                 </div>
@@ -694,7 +695,7 @@ const AdminSummary = () => {
 
         {/* ================= CHARTS ================= */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <Card className="p-6 lg:col-span-7">
+          <Card className="p-5 sm:p-6 lg:col-span-7">
             <CardHeader icon={Building} title="Team size by department" sub={`${data.depts.length} departments`} color={C.brand} />
             {data.depts.length === 0 ? (
               <Empty text="No department data yet" />
@@ -705,7 +706,7 @@ const AdminSummary = () => {
                     <BarChart data={data.depts} layout="vertical" margin={{ left: 4, right: 20 }}>
                       <CartesianGrid horizontal={false} stroke="#f1f5f9" />
                       <XAxis type="number" allowDecimals={false} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
-                      <YAxis type="category" dataKey="name" width={110} tick={{ fill: "#374151", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" width={90} tick={{ fill: "#374151", fontSize: 12, fontWeight: 500 }} axisLine={false} tickLine={false} />
                       <Tooltip cursor={{ fill: "#f8fafc" }} contentStyle={tooltipStyle} />
                       <Bar dataKey="value" name="Employees" radius={[0, 10, 10, 0]} barSize={20}>
                         {data.depts.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -717,7 +718,7 @@ const AdminSummary = () => {
             )}
           </Card>
 
-          <Card className="p-6 lg:col-span-5">
+          <Card className="p-5 sm:p-6 lg:col-span-5">
             <CardHeader icon={CalendarClock} title="Leave requests" sub={`${leaveTotal} in total`} color={C.amber} />
             {leaveTotal === 0 ? (
               <Empty text="No leave requests yet" />
@@ -752,7 +753,7 @@ const AdminSummary = () => {
         </div>
 
         {/* ================= BIRTHDAYS ================= */}
-        <Card className="p-6 sm:p-8">
+        <Card className="p-5 sm:p-8">
           <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-pink-100/60 blur-2xl" />
           <CardHeader icon={Cake} title="Birthdays" sub={`${todayBdays.length} today · ${upcoming.length} coming up`} color={C.pink} />
           {todayBdays.length === 0 && upcoming.length === 0 ? (
@@ -840,7 +841,7 @@ const Donut = ({ icon, title, data, ready, offset, color }) => {
   const colorAt = (i) => CHART_COLORS[(i + offset) % CHART_COLORS.length];
 
   return (
-    <Card className="p-6">
+    <Card className="p-5 sm:p-6">
       <CardHeader icon={icon} title={title} sub={`${data.length} categories`} color={color} />
       {total === 0 ? (
         <Empty text="No data yet" />

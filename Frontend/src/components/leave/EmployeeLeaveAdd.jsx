@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar, FileText, ArrowRight, Check, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X,
   AlertTriangle, Clock, Briefcase, ShieldCheck, TrendingUp, Umbrella, Stethoscope, Loader2, Send,
-  CheckCircle2, Info, Sparkles, PartyPopper,
+  CheckCircle2, Info, Sparkles, PartyPopper, Baby, HeartHandshake, Repeat, Wallet,
 } from "lucide-react";
 
 const PAGE_BG =
@@ -15,6 +15,10 @@ const PAGE_BG =
 const CARD =
   "rounded-3xl bg-white/90 ring-1 ring-white/70 shadow-[0_10px_40px_-12px_rgba(127,29,29,0.18)] backdrop-blur";
 const ANNUAL_QUOTA = 12;
+// keep these in step with leaveController.js
+const PATERNITY_QUOTA = 15;          // working days per year
+const MATERNITY_MAX_DAYS = 182;      // 26 weeks per application (calendar days)
+const COMP_OFF_VALID_DAYS = 60;      // claim within this many days of the worked day
 const REASON_MAX = 500;
 const REDIRECT_MS = 2000;
 
@@ -397,21 +401,37 @@ const ErrorAlert = ({ message, onClose }) => (
 );
 
 const LEAVE_TYPES = [
-  { value: "Casual Leave", label: "Casual leave", key: "casual", Icon: Umbrella, hint: "Personal work, travel, family", grad: "from-violet-500 to-fuchsia-500", soft: "bg-violet-50 text-violet-700 ring-violet-200", bar: "bg-violet-500" },
-  { value: "Sick Leave", label: "Sick leave", key: "sick", Icon: Stethoscope, hint: "Illness, doctor visits", grad: "from-rose-500 to-red-500", soft: "bg-rose-50 text-rose-700 ring-rose-200", bar: "bg-rose-500" },
+  { value: "Casual Leave", label: "Casual leave", key: "casual", quota: ANNUAL_QUOTA, Icon: Umbrella, hint: "Personal work, travel, family", grad: "from-violet-500 to-fuchsia-500", soft: "bg-violet-50 text-violet-700 ring-violet-200", bar: "bg-violet-500" },
+  { value: "Sick Leave", label: "Sick leave", key: "sick", quota: ANNUAL_QUOTA, Icon: Stethoscope, hint: "Illness, doctor visits", grad: "from-rose-500 to-red-500", soft: "bg-rose-50 text-rose-700 ring-rose-200", bar: "bg-rose-500" },
+  { value: "Comp Off", label: "Comp-off", key: "compOff", quota: null, Icon: Repeat, hint: "For a weekend or holiday you worked", note: "1 day per worked day", grad: "from-sky-500 to-cyan-500", soft: "bg-sky-50 text-sky-700 ring-sky-200", bar: "bg-sky-500" },
+  { value: "Maternity Leave", label: "Maternity leave", key: "maternity", quota: null, Icon: Baby, hint: "Paid leave for childbirth", note: "Up to 26 weeks", grad: "from-pink-500 to-rose-500", soft: "bg-pink-50 text-pink-700 ring-pink-200", bar: "bg-pink-500" },
+  { value: "Paternity Leave", label: "Paternity leave", key: "paternity", quota: PATERNITY_QUOTA, Icon: HeartHandshake, hint: "Time off for a new father", grad: "from-emerald-500 to-teal-500", soft: "bg-emerald-50 text-emerald-700 ring-emerald-200", bar: "bg-emerald-500" },
+  { value: "Loss of Pay", label: "Loss of pay", key: "lop", quota: null, Icon: Wallet, hint: "Unpaid, when paid leave runs out", note: "Deducted from salary", grad: "from-slate-600 to-slate-800", soft: "bg-slate-100 text-slate-700 ring-slate-200", bar: "bg-slate-500" },
 ];
 const QUICK_REASONS = {
   "Casual Leave": ["Personal work", "Family function", "Travelling out of town", "Festival at home"],
   "Sick Leave": ["Not feeling well", "Fever / cold", "Doctor's appointment", "Medical check-up"],
+  "Comp Off": ["Worked at the event on the weekend", "Worked on a holiday", "Venue setup on Sunday"],
+  "Maternity Leave": ["Maternity leave", "Expected delivery date", "Doctor-advised rest"],
+  "Paternity Leave": ["Birth of my child", "Supporting my partner", "Hospital stay"],
+  "Loss of Pay": ["Paid leave used up", "Personal emergency", "Extended travel"],
   "": ["Personal work", "Not feeling well", "Family function"],
 };
 
 const EmployeeLeaveAdd = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const employeeGender = user?.gender?.trim().toLowerCase();
+  const availableLeaveTypes = LEAVE_TYPES.filter((type) =>
+    type.value === "Maternity Leave"
+      ? employeeGender === "female"
+      : type.value === "Paternity Leave"
+        ? employeeGender === "male"
+        : true
+  );
 
-  const [leave, setLeave] = useState({ leaveType: "", startDate: "", endDate: "", reason: "" });
-  const [balance, setBalance] = useState({ casual: 12, sick: 12 });
+  const [leave, setLeave] = useState({ leaveType: "", startDate: "", endDate: "", reason: "", compOffFor: "" });
+  const [balance, setBalance] = useState({ casual: 12, sick: 12, paternity: PATERNITY_QUOTA });
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -480,9 +500,16 @@ const EmployeeLeaveAdd = () => {
           .filter(l => l.status === "Approved" && l.leaveType === "Sick Leave")
           .reduce((total, l) => total + calculateWorkingDays(l.startDate, l.endDate, hData), 0);
 
+        // Paternity: approved + pending this calendar year (same rule as the server)
+        const thisYear = String(new Date().getFullYear());
+        const paternityHeld = approvedLeaves
+          .filter(l => ["Approved", "Pending"].includes(l.status) && l.leaveType === "Paternity Leave" && toLocalYMD(l.startDate).startsWith(thisYear))
+          .reduce((total, l) => total + calculateWorkingDays(l.startDate, l.endDate, hData), 0);
+
         setBalance({
           casual: Math.max(0, 12 - casualUsed),
-          sick: Math.max(0, 12 - sickUsed)
+          sick: Math.max(0, 12 - sickUsed),
+          paternity: Math.max(0, PATERNITY_QUOTA - paternityHeld),
         });
       } catch (e) {
         console.error("Data Fetch Error:", e);
@@ -508,21 +535,26 @@ const EmployeeLeaveAdd = () => {
     setTouched({ leaveType: true, startDate: true, endDate: true, reason: true });
     if (!leave.leaveType || !leave.startDate || !leave.endDate || !leave.reason.trim()) return;
 
-    const currentBalance = leave.leaveType === "Sick Leave" ? balance.sick : balance.casual;
-    if (daysCount > currentBalance) {
+    if (isInsufficient) {
       setErrorMsg("Insufficient leave balance.");
+      return;
+    }
+    if (typeProblem) {
+      setErrorMsg(typeProblem);
       return;
     }
 
     try {
       setLoading(true);
       // Ensure startDate and endDate are sent as YYYY-MM-DD (local)
+      const { compOffFor, ...rest } = leave;
       const payload = {
-        ...leave,
+        ...rest,
         startDate: toLocalYMD(leave.startDate),
         endDate: toLocalYMD(leave.endDate),
         days: daysCount,
-        userId: user._id
+        userId: user._id,
+        ...(leave.leaveType === "Comp Off" ? { compOffFor } : {}),
       };
       const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/leave/add`,
         payload,
@@ -539,8 +571,8 @@ const EmployeeLeaveAdd = () => {
     }
   };
 
-  const isInsufficient = (leave.leaveType === "Sick Leave" && daysCount > balance.sick) ||
-                         (leave.leaveType === "Casual Leave" && daysCount > balance.casual);
+  const typeMeta = LEAVE_TYPES.find((t) => t.value === leave.leaveType);
+  const isInsufficient = !!typeMeta?.quota && daysCount > balance[typeMeta.key];
 
   /* ---------- UI-only derived ---------- */
   const todayISO = toLocalYMD(new Date());
@@ -562,11 +594,26 @@ const EmployeeLeaveAdd = () => {
     }
     return out;
   }, [leave.startDate, leave.endDate, holidayMap]); // eslint-disable-line
-  const calDays = strip.length;
+  const calDays = start && end && end >= start ? Math.round((end - start) / 86400000) + 1 : 0;
   const skippedHolidays = strip.filter((d) => d.holiday && !d.weekend);
-  const type = LEAVE_TYPES.find((t) => t.value === leave.leaveType);
-  const typeBalance = type ? balance[type.key] : null;
+  const type = typeMeta;
+  const typeBalance = type?.quota ? balance[type.key] : null;
   const after = typeBalance !== null ? typeBalance - daysCount : null;
+
+  /* type-specific checks (the server checks the same rules) */
+  const isComp = leave.leaveType === "Comp Off";
+  const worked = parseISO(leave.compOffFor);
+  const workedIsOffDay = worked ? [0, 6].includes(worked.getDay()) || !!holidayMap[leave.compOffFor] : false;
+  const compMin = toLocalYMD(addDays(new Date(new Date().setHours(0, 0, 0, 0)), -COMP_OFF_VALID_DAYS));
+  const typeProblem = isComp
+    ? !leave.compOffFor ? "Pick the weekend or holiday you worked"
+      : !workedIsOffDay ? "That day was a normal working day, so it doesn't earn comp-off"
+      : leave.startDate && leave.startDate <= leave.compOffFor ? "Take the comp-off after the day you worked"
+      : daysCount > 1 ? "One worked day = one comp-off day. Pick a single day."
+      : ""
+    : leave.leaveType === "Maternity Leave" && calDays > MATERNITY_MAX_DAYS
+      ? `Maternity leave is up to 26 weeks (${MATERNITY_MAX_DAYS} days) per application`
+      : "";
   const upcomingHolidays = holidays
     .filter((h) => toLocalYMD(h.date || h) >= todayISO)
     .sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -577,8 +624,9 @@ const EmployeeLeaveAdd = () => {
     endDate: touched.endDate && !leave.endDate ? "Pick an end date." : "",
     reason: touched.reason && !leave.reason.trim() ? "Add a short reason." : "",
   };
-  const canSubmit = !loading && daysCount > 0 && !isInsufficient && !!leave.leaveType && !!leave.reason.trim();
+  const canSubmit = !loading && daysCount > 0 && !isInsufficient && !typeProblem && !!leave.leaveType && !!leave.reason.trim();
   const blocker = !leave.leaveType ? "Choose a leave type"
+    : typeProblem && (isComp ? true : leave.startDate && leave.endDate) ? typeProblem
     : !leave.startDate || !leave.endDate ? "Pick your dates"
     : daysCount === 0 ? "Those dates are all non-working days"
     : isInsufficient ? "Not enough balance"
@@ -594,7 +642,11 @@ const EmployeeLeaveAdd = () => {
   };
   const addReason = (r) => setLeave((p) => ({ ...p, reason: p.reason.trim() ? `${p.reason.trim()} — ${r}` : r }));
   const endQuick = start
-    ? [["Same day", start], ["2 days", addDays(start, 1)], ["3 days", addDays(start, 2)], ["Till Friday", addDays(start, Math.max(0, 5 - start.getDay()))]]
+    ? (leave.leaveType === "Maternity Leave"
+        ? [["12 weeks", addDays(start, 83)], ["26 weeks", addDays(start, MATERNITY_MAX_DAYS - 1)]]
+        : leave.leaveType === "Comp Off"
+          ? [["Same day", start]]
+          : [["Same day", start], ["2 days", addDays(start, 1)], ["3 days", addDays(start, 2)], ["Till Friday", addDays(start, Math.max(0, 5 - start.getDay()))]])
         .filter(([, d], i, arr) => arr.findIndex(([, x]) => sameDay(x, d)) === i)
     : [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -638,29 +690,37 @@ const EmployeeLeaveAdd = () => {
             {/* Step 1: type */}
             <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} p-5 sm:p-6`}>
               <StepTitle n={1} title="Leave type" done={!!leave.leaveType} error={errs.leaveType} />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {LEAVE_TYPES.map((t) => {
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+                {availableLeaveTypes.map((t) => {
                   const on = leave.leaveType === t.value;
-                  const left = balance[t.key];
-                  const empty = !fetchingData && left <= 0;
+                  const left = t.quota ? balance[t.key] : null;
+                  const empty = !!t.quota && !fetchingData && left <= 0;
                   return (
                     <button key={t.value} type="button"
                       onClick={() => { setLeave((p) => ({ ...p, leaveType: t.value })); setTouched((x) => ({ ...x, leaveType: true })); }}
-                      className={`relative overflow-hidden rounded-2xl p-4 text-left transition ${on ? `bg-gradient-to-br ${t.grad} text-white shadow-lg` : "bg-white ring-1 ring-gray-200 hover:ring-red-200"}`}>
+                      className={`relative min-w-0 overflow-hidden rounded-2xl p-3 text-left transition sm:p-4 ${on ? `bg-gradient-to-br ${t.grad} text-white shadow-lg` : "bg-white ring-1 ring-gray-200 hover:ring-red-200"}`}>
                       {on && <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-white text-red-600"><Check size={12} strokeWidth={3} /></span>}
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${on ? "bg-white/20" : t.soft + " ring-1"}`}><t.Icon size={19} /></div>
-                      <p className={`mt-3 text-base font-extrabold ${on ? "" : "text-gray-900"}`}>{t.label}</p>
-                      <p className={`text-xs ${on ? "text-white/80" : "text-gray-400"}`}>{t.hint}</p>
-                      <div className="mt-3 flex items-end justify-between">
-                        <p className={`text-xs font-semibold ${on ? "text-white/90" : empty ? "text-red-600" : "text-gray-500"}`}>
-                          {fetchingData ? "Loading…" : empty ? "None left" : `${left} of ${ANNUAL_QUOTA} left`}
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10 ${on ? "bg-white/20" : t.soft + " ring-1"}`}><t.Icon size={18} /></div>
+                      <p className={`mt-2.5 pr-5 text-sm font-extrabold leading-tight sm:mt-3 sm:text-base ${on ? "" : "text-gray-900"}`}>{t.label}</p>
+                      <p className={`line-clamp-2 min-h-[2rem] text-[11px] leading-snug sm:text-xs ${on ? "text-white/80" : "text-gray-400"}`}>{t.hint}</p>
+                      {t.quota ? (
+                        <>
+                          <div className="mt-2 flex items-end justify-between gap-1">
+                            <p className={`truncate text-[11px] font-semibold sm:text-xs ${on ? "text-white/90" : empty ? "text-red-600" : "text-gray-500"}`}>
+                              {fetchingData ? "Loading…" : empty ? "None left" : `${left} of ${t.quota} left`}
+                            </p>
+                            <p className={`text-xl font-extrabold leading-none tabular-nums sm:text-2xl ${on ? "" : "text-gray-900"}`}>{fetchingData ? "–" : left}</p>
+                          </div>
+                          <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${on ? "bg-white/25" : "bg-gray-100"}`}>
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${fetchingData ? 0 : (left / t.quota) * 100}%` }} transition={{ duration: 0.7 }}
+                              className={`h-full rounded-full ${on ? "bg-white" : t.bar}`} />
+                          </div>
+                        </>
+                      ) : (
+                        <p className={`mt-2 inline-flex max-w-full items-center rounded-xl px-2 py-0.5 text-[11px] font-bold leading-snug ${on ? "bg-white/20" : t.soft + " ring-1"}`}>
+                          {t.note}
                         </p>
-                        <p className={`text-2xl font-extrabold leading-none tabular-nums ${on ? "" : "text-gray-900"}`}>{fetchingData ? "–" : left}</p>
-                      </div>
-                      <div className={`mt-2 h-1.5 overflow-hidden rounded-full ${on ? "bg-white/25" : "bg-gray-100"}`}>
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${fetchingData ? 0 : (left / ANNUAL_QUOTA) * 100}%` }} transition={{ duration: 0.7 }}
-                          className={`h-full rounded-full ${on ? "bg-white" : t.bar}`} />
-                      </div>
+                      )}
                     </button>
                   );
                 })}
@@ -669,7 +729,34 @@ const EmployeeLeaveAdd = () => {
 
             {/* Step 2: dates */}
             <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className={`${CARD} p-5 sm:p-6`}>
-              <StepTitle n={2} title="Dates" done={!!leave.startDate && !!leave.endDate && daysCount > 0} error={errs.startDate || errs.endDate} />
+              <StepTitle n={2} title="Dates" done={!!leave.startDate && !!leave.endDate && daysCount > 0 && !typeProblem} error={errs.startDate || errs.endDate} />
+
+              {isComp && (
+                <div className="mb-4 rounded-2xl bg-sky-50/70 p-3 ring-1 ring-sky-100 sm:p-4">
+                  <label htmlFor="la-worked" className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-sky-800">
+                    <Repeat size={13} /> Which weekend or holiday did you work?
+                  </label>
+                  <DatePicker id="la-worked" value={leave.compOffFor} onChange={(v) => setLeave((p) => ({ ...p, compOffFor: v }))}
+                    min={compMin} max={todayISO} startView="days" title="Day you worked" placeholder="Pick the day you worked"
+                    invalid={!!leave.compOffFor && !workedIsOffDay} quick={[]}
+                    describe={(d) => `${d.toLocaleDateString("en-IN", { weekday: "long" })}${holidayMap[toLocalYMD(d)] ? ` · ${holidayMap[toLocalYMD(d)]}` : [0, 6].includes(d.getDay()) ? " · weekend" : " · working day"}`} />
+                  <p className={`mt-2 text-[11px] ${leave.compOffFor && !workedIsOffDay ? "font-semibold text-red-600" : "text-sky-700/80"}`}>
+                    {leave.compOffFor && !workedIsOffDay
+                      ? "That was a normal working day. Pick a Saturday, Sunday or holiday."
+                      : `Must be within the last ${COMP_OFF_VALID_DAYS} days. Each worked day can be claimed once, and your manager will verify it.`}
+                  </p>
+                </div>
+              )}
+              {leave.leaveType === "Maternity Leave" && (
+                <p className="mb-4 flex items-start gap-2 rounded-2xl bg-pink-50 p-3 text-xs text-pink-800 ring-1 ring-pink-100">
+                  <Baby size={14} className="mt-px shrink-0" /> Up to 26 weeks ({MATERNITY_MAX_DAYS} days) per application. Use the "26 weeks" shortcut on the end date.
+                </p>
+              )}
+              {leave.leaveType === "Loss of Pay" && (
+                <p className="mb-4 flex items-start gap-2 rounded-2xl bg-slate-100 p-3 text-xs text-slate-700 ring-1 ring-slate-200">
+                  <Wallet size={14} className="mt-px shrink-0" /> These days are unpaid and will be deducted from your salary once approved.
+                </p>
+              )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="la-start" className="mb-1.5 block text-xs font-semibold text-gray-600">From</label>
@@ -714,6 +801,11 @@ const EmployeeLeaveAdd = () => {
                 )}
               </AnimatePresence>
 
+              {typeProblem && leave.startDate && leave.endDate && !(isComp && !leave.compOffFor) && (
+                <p className="mt-3 flex items-center gap-2 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700 ring-1 ring-red-100">
+                  <AlertTriangle size={14} className="shrink-0" /> {typeProblem}
+                </p>
+              )}
               {leave.startDate && leave.endDate && daysCount === 0 && (
                 <p className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-100">
                   <AlertTriangle size={14} className="shrink-0" /> Range only contains non-working days — no leave needed.
@@ -769,7 +861,19 @@ const EmployeeLeaveAdd = () => {
                 <div className="space-y-3 p-5 sm:p-6">
                   <Row label="Type" value={type ? <span className="inline-flex items-center gap-1.5"><type.Icon size={14} className="text-red-500" />{type.label}</span> : <span className="text-gray-300">Not chosen</span>} />
                   <Row label="Requested by" value={user?.name || "—"} />
-                  {type && (
+                  {type && !type.quota && (
+                    <div className={`rounded-2xl p-3 text-xs ring-1 ${type.soft}`}>
+                      <p className="flex items-center gap-1.5 font-bold"><type.Icon size={13} /> {type.note}</p>
+                      <p className="mt-1 opacity-80">
+                        {isComp
+                          ? worked ? `For ${fmtLong(worked)}${holidayMap[leave.compOffFor] ? ` (${holidayMap[leave.compOffFor]})` : ""}.` : "Pick the day you worked."
+                          : type.key === "maternity"
+                            ? `${calDays} of ${MATERNITY_MAX_DAYS} calendar days used in this application.`
+                            : `${daysCount} unpaid day${daysCount === 1 ? "" : "s"} will be deducted once approved.`}
+                      </p>
+                    </div>
+                  )}
+                  {type?.quota && (
                     <div className={`rounded-2xl p-3 ring-1 ${isInsufficient ? "bg-red-50 ring-red-100" : "bg-gray-50 ring-gray-100"}`}>
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold text-gray-600">Balance</span>
@@ -779,9 +883,9 @@ const EmployeeLeaveAdd = () => {
                         </span>
                       </div>
                       <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white">
-                        <div className={`h-full ${type.bar}`} style={{ width: `${Math.max(0, Math.min(100, ((typeBalance - daysCount) / ANNUAL_QUOTA) * 100))}%` }} />
+                        <div className={`h-full ${type.bar}`} style={{ width: `${Math.max(0, Math.min(100, ((typeBalance - daysCount) / type.quota) * 100))}%` }} />
                         <div className="h-full bg-red-300 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(255,255,255,.6)_3px,rgba(255,255,255,.6)_6px)]"
-                          style={{ width: `${Math.max(0, Math.min(100, (Math.min(daysCount, typeBalance) / ANNUAL_QUOTA) * 100))}%` }} />
+                          style={{ width: `${Math.max(0, Math.min(100, (Math.min(daysCount, typeBalance) / type.quota) * 100))}%` }} />
                       </div>
                       {isInsufficient && (
                         <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-700">

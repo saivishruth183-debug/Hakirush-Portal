@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, CheckCircle2, XCircle, Loader2, CalendarClock, Wallet, Mail, Briefcase, Hash,
   Building2, Quote, AlertTriangle, X, CalendarDays, ArrowRight, Clock3, SearchX, Info, ShieldCheck,
+  Repeat, Baby,
 } from "lucide-react";
 
 const PAGE_BG =
@@ -233,9 +234,16 @@ const LeaveDetails = () => {
   })();
   const calDays = dayStrip.length;
   const typeKey = String(leave.leaveType || "").toLowerCase();
-  const balanceKey = typeKey.includes("sick") ? "sick" : typeKey.includes("casual") ? "casual" : null;
-  const affected = balance && balanceKey ? balance[balanceKey] : null;
-  const afterApproval = affected ? Number(affected.balance) - netDays : null;
+  const balanceKey = typeKey.includes("sick") ? "sick" : typeKey.includes("casual") ? "casual" : typeKey.includes("paternity") ? "paternity" : null;
+  const isCompOff = typeKey.includes("comp");
+  const isLop = typeKey.includes("loss of pay");
+  const isMaternity = typeKey.includes("maternity");
+  const workedOn = leave.compOffFor ? new Date(leave.compOffFor) : null;
+  const workedLabel = workedOn ? (holidayMap[toLocalYMD(workedOn)] || ([0, 6].includes(workedOn.getDay()) ? "weekend" : "a working day")) : null;
+  const affected = balance && balanceKey && balance[balanceKey] ? balance[balanceKey] : null;
+  // Paternity balance from the server already holds back pending requests, so don't subtract twice.
+  const afterApproval = affected ? (balanceKey === "paternity" ? Number(affected.balance) : Number(affected.balance) - netDays) : null;
+  const beforeApproval = affected ? (balanceKey === "paternity" ? Number(affected.balance) + netDays : Number(affected.balance)) : null;
   const startsIn = (() => {
     const t = new Date(); t.setHours(0, 0, 0, 0);
     const s = new Date(leave.startDate); s.setHours(0, 0, 0, 0);
@@ -262,6 +270,7 @@ const LeaveDetails = () => {
             balanceKey={balanceKey}
             affected={affected}
             afterApproval={afterApproval}
+            beforeApproval={beforeApproval}
             busy={actionLoading}
             onCancel={() => !actionLoading && setConfirm(null)}
             onConfirm={() => changeStatus(leave._id, confirm)}
@@ -361,6 +370,28 @@ const LeaveDetails = () => {
                   </p>
                 </div>
 
+                {isCompOff && (
+                  <div className="mt-4 flex items-start gap-3 rounded-2xl bg-sky-50 p-3 ring-1 ring-sky-100">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 ring-1 ring-sky-100"><Repeat size={16} /></span>
+                    <div className="min-w-0 text-sm">
+                      <p className="font-bold text-sky-900">Comp-off for {workedOn ? longDate(workedOn) : "—"}</p>
+                      <p className="text-xs text-sky-800/80">
+                        {workedOn ? `${workedOn.toLocaleDateString("en-IN", { weekday: "long" })} · ${workedLabel}. ` : ""}Check they actually worked that day before approving.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {isLop && (
+                  <p className="mt-4 flex items-start gap-2 rounded-2xl bg-slate-100 p-3 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
+                    <Wallet size={14} className="mt-px shrink-0" /> Unpaid leave: if approved, deduct {netDays} day{netDays === 1 ? "" : "s"} as Loss of Pay in this month's payslip.
+                  </p>
+                )}
+                {isMaternity && (
+                  <p className="mt-4 flex items-start gap-2 rounded-2xl bg-pink-50 p-3 text-xs font-semibold text-pink-800 ring-1 ring-pink-100">
+                    <Baby size={14} className="mt-px shrink-0" /> Paid maternity leave · {calDays} of 182 calendar days (26 weeks).
+                  </p>
+                )}
+
                 {/* day strip */}
                 {dayStrip.length > 0 && (
                   <div className="mt-4">
@@ -426,11 +457,33 @@ const LeaveDetails = () => {
                     tone="rose"
                     impact={isPending && balanceKey === "sick" ? netDays : 0}
                   />
+                  {balance.paternity && (balanceKey === "paternity" || balance.paternity.used > 0) && (
+                    <BalanceCard
+                      label="Paternity leave"
+                      total={balance.paternity.total}
+                      used={balance.paternity.used}
+                      remaining={Math.max(0, balance.paternity.total - balance.paternity.used)}
+                      tone="sky"
+                      impact={isPending && balanceKey === "paternity" ? netDays : 0}
+                    />
+                  )}
+                  {balance.lossOfPay?.used > 0 && (
+                    <p className="flex items-center justify-between rounded-2xl bg-slate-50 p-3 text-xs ring-1 ring-slate-100">
+                      <span className="font-semibold text-slate-600">Loss of pay this year</span>
+                      <b className="text-slate-900">{balance.lossOfPay.used} day{balance.lossOfPay.used === 1 ? "" : "s"}</b>
+                    </p>
+                  )}
+                  {balance.compOff?.used > 0 && (
+                    <p className="flex items-center justify-between rounded-2xl bg-sky-50/60 p-3 text-xs ring-1 ring-sky-100">
+                      <span className="font-semibold text-sky-700">Comp-off taken this year</span>
+                      <b className="text-sky-900">{balance.compOff.used} day{balance.compOff.used === 1 ? "" : "s"}</b>
+                    </p>
+                  )}
                   {isPending && affected && (
                     <p className={`flex items-start gap-1.5 rounded-2xl p-3 text-xs ring-1 ${afterApproval < 0 ? "bg-red-50 text-red-700 ring-red-100" : "bg-gray-50 text-gray-600 ring-gray-100"}`}>
                       {afterApproval < 0 ? <AlertTriangle size={14} className="mt-px shrink-0" /> : <Info size={14} className="mt-px shrink-0" />}
                       <span>
-                        If approved, {balanceKey} leave goes from <b>{affected.balance}</b> to <b>{afterApproval}</b> day{Math.abs(afterApproval) === 1 ? "" : "s"}.
+                        If approved, {balanceKey} leave goes from <b>{beforeApproval}</b> to <b>{afterApproval}</b> day{Math.abs(afterApproval) === 1 ? "" : "s"}.
                         {afterApproval < 0 && " This is more than they have left."}
                       </span>
                     </p>
@@ -482,7 +535,7 @@ const LeaveDetails = () => {
 };
 
 /* ================= CONFIRM MODAL ================= */
-const ConfirmModal = ({ decision, name, leave, netDays, balanceKey, affected, afterApproval, busy, onCancel, onConfirm }) => {
+const ConfirmModal = ({ decision, name, leave, netDays, balanceKey, affected, afterApproval, beforeApproval, busy, onCancel, onConfirm }) => {
   const approve = decision === "Approved";
   return (
     <Modal onClose={onCancel} dismissable={!busy}>
@@ -506,7 +559,7 @@ const ConfirmModal = ({ decision, name, leave, netDays, balanceKey, affected, af
           </p>
           {approve && affected && (
             <p className={`text-xs ${afterApproval < 0 ? "font-semibold text-red-600" : "text-gray-500"}`}>
-              {balanceKey === "sick" ? "Sick" : "Casual"} balance: {affected.balance} → {afterApproval} day{Math.abs(afterApproval) === 1 ? "" : "s"}
+              {balanceKey === "sick" ? "Sick" : balanceKey === "paternity" ? "Paternity" : "Casual"} balance: {beforeApproval} → {afterApproval} day{Math.abs(afterApproval) === 1 ? "" : "s"}
               {afterApproval < 0 && " (over their allowance)"}
             </p>
           )}
@@ -552,7 +605,9 @@ const BalanceCard = ({ label, total, used, remaining, tone, impact = 0 }) => {
   const impactPct = total > 0 ? Math.min(100 - pct, Math.round((impact / total) * 100)) : 0;
   const t = tone === "emerald"
     ? { bg: "bg-emerald-50/70 ring-emerald-100", text: "text-emerald-700", bar: "bg-emerald-500" }
-    : { bg: "bg-rose-50/70 ring-rose-100", text: "text-rose-700", bar: "bg-rose-500" };
+    : tone === "sky"
+      ? { bg: "bg-sky-50/70 ring-sky-100", text: "text-sky-700", bar: "bg-sky-500" }
+      : { bg: "bg-rose-50/70 ring-rose-100", text: "text-rose-700", bar: "bg-rose-500" };
   return (
     <div className={`rounded-2xl p-4 ring-1 ${t.bg} ${impact ? "ring-2" : ""}`}>
       <div className="flex items-center justify-between">

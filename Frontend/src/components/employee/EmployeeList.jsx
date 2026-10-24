@@ -87,18 +87,20 @@ const StatCard = ({ icon: Icon, label, value, tone, i, active, onClick }) => (
     whileHover={onClick ? { y: -3 } : undefined}
     onClick={onClick}
     disabled={!onClick}
-    className={`group relative overflow-hidden rounded-3xl p-5 text-left transition disabled:cursor-default ${
+    className={`group relative min-w-0 overflow-hidden rounded-2xl p-3.5 text-left transition disabled:cursor-default sm:rounded-3xl sm:p-5 ${
       active ? "bg-white shadow-lg ring-2 ring-red-300" : "bg-white/85 shadow-[0_10px_30px_-14px_rgba(127,29,29,0.18)] ring-1 ring-white/70 backdrop-blur-sm hover:bg-white"
     }`}
   >
-    <div className={`pointer-events-none absolute -bottom-6 -right-6 opacity-[0.08] transition-transform duration-500 group-hover:scale-110 ${tone.text}`}>
+    <div className={`pointer-events-none absolute -bottom-6 -right-6 hidden opacity-[0.07] sm:block transition-transform duration-500 group-hover:scale-110 ${tone.text}`}>
       <Icon size={96} strokeWidth={1.5} />
     </div>
-    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone.bg} ${tone.text}`}>
-      <Icon size={18} />
+    <div className="flex items-center gap-2.5 sm:block">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${tone.bg} ${tone.text}`}>
+        <Icon size={17} />
+      </div>
+      <p className="text-2xl font-extrabold tabular-nums tracking-tight text-gray-900 sm:mt-4 sm:text-3xl">{value}</p>
     </div>
-    <p className="mt-4 text-3xl font-extrabold tabular-nums tracking-tight text-gray-900">{value}</p>
-    <p className="mt-0.5 text-xs font-medium text-gray-500">{label}</p>
+    <p className="mt-1.5 truncate text-xs font-medium text-gray-500 sm:mt-0.5">{label}</p>
   </motion.button>
 );
 
@@ -113,8 +115,8 @@ const List = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(() => {
     const requestedStatus = searchParams.get("status");
-    return requestedStatus === "active" || requestedStatus === "inactive" ? requestedStatus : "all";
-  }); // "all" | "active" | "inactive"
+    return ["all", "active", "inactive"].includes(requestedStatus) ? requestedStatus : "active";
+  }); // "all" | "active" | "inactive"; active employees are the default view
   const [deptFilter, setDeptFilter] = useState("all");
   const [sort, setSort] = useState("id");
   const [view, setView] = useState("list");
@@ -229,8 +231,8 @@ const List = () => {
     return pages;
   }, [totalPages, safePage]);
 
-  const isFiltered = !!search || statusFilter !== "all" || deptFilter !== "all";
-  const clearAll = () => { setSearch(""); setStatusFilter("all"); setDeptFilter("all"); };
+  const isFiltered = !!search || statusFilter !== "active" || deptFilter !== "all";
+  const clearAll = () => { setSearch(""); setStatusFilter("active"); setDeptFilter("all"); };
 
   const exportCSV = () => {
     const rows = [
@@ -250,30 +252,30 @@ const List = () => {
   };
 
   const selectCls =
-    "w-full cursor-pointer appearance-none rounded-2xl bg-gray-50 py-3 pl-9 pr-9 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-red-300";
+    "w-full min-w-0 cursor-pointer appearance-none truncate rounded-2xl bg-gray-50 py-3 pl-9 pr-8 text-[13px] font-semibold sm:text-sm text-gray-700 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-red-300";
 
   return (
-    <div className={`min-h-screen pb-20 font-sans text-gray-700 ${PAGE_BG}`}>
-      <div className="mx-auto max-w-[1300px] space-y-6 p-4 sm:p-8">
+    <div className={`min-h-screen overflow-x-hidden pb-20 font-sans text-gray-700 ${PAGE_BG}`}>
+      <div className="mx-auto w-full max-w-[1300px] space-y-5 p-3 sm:space-y-6 sm:p-8">
         {/* ================= HEADER ================= */}
         <motion.header
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}
           className="flex flex-col gap-5 pt-2 sm:flex-row sm:items-end sm:justify-between"
         >
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
               <Users size={24} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-600">People</p>
               <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
                 Employee <span className="text-red-600">Directory</span>
               </h1>
-              <p className="mt-0.5 text-sm text-gray-500">Everyone in the organisation, searchable by name, ID or team.</p>
+              <p className="mt-0.5 hidden text-sm text-gray-500 sm:block">Active employees are shown by default. Switch to Everyone to include inactive staff.</p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <button
               onClick={fetchEmployees}
               disabled={empLoading}
@@ -292,7 +294,7 @@ const List = () => {
             </button>
             <Link
               to="/admin-dashboard/add-employee"
-              className="group inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]"
+              className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-5 py-3 sm:flex-none text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98]"
             >
               <UserPlus size={17} /> Add employee
             </Link>
@@ -331,13 +333,13 @@ const List = () => {
           className="overflow-hidden rounded-3xl bg-white/90 shadow-[0_20px_50px_-20px_rgba(127,29,29,0.22)] ring-1 ring-white/70 backdrop-blur-sm"
         >
           {/* toolbar */}
-          <div className="space-y-3 border-b border-red-50 p-4 sm:p-5">
+          <div className="space-y-3 border-b border-red-50 p-3 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <label className="relative flex-1">
+              <label className="relative min-w-0 flex-1">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by name, employee ID, designation or department…"
+                  placeholder="Search name, ID, role or team…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full rounded-2xl bg-gray-50 py-3 pl-11 pr-10 text-sm font-medium text-gray-900 ring-1 ring-gray-200 transition placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-300"
@@ -352,7 +354,7 @@ const List = () => {
 
               <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
                 {/* department */}
-                <div className="relative sm:w-48">
+                <div className="relative min-w-0 sm:w-48">
                   <Building2 size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} aria-label="Filter by department" className={selectCls}>
                     <option value="all">All departments</option>
@@ -363,7 +365,7 @@ const List = () => {
                 </div>
 
                 {/* sort */}
-                <div className="relative sm:w-44">
+                <div className="relative min-w-0 sm:w-44">
                   <ArrowUpDown size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort" className={selectCls}>
                     {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -389,7 +391,7 @@ const List = () => {
 
             {/* status chips */}
             {(hasStatusData || isFiltered) && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {hasStatusData &&
                   [ ["all", "Everyone"], ["active", "Active"], ["inactive", "Inactive"] ].map(([key, label]) => {
                     const on = statusFilter === key;
@@ -412,7 +414,7 @@ const List = () => {
                   })}
                 {isFiltered && (
                   <>
-                    <span className="ml-auto shrink-0 text-xs text-gray-400">{filteredEmployees.length} found</span>
+                    <span className="ml-auto shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">{filteredEmployees.length} found</span>
                     <button onClick={clearAll} className="shrink-0 text-xs font-semibold text-red-600 hover:underline">Clear</button>
                   </>
                 )}
@@ -469,7 +471,7 @@ const List = () => {
           ) : (
             <>
               {/* ---------- MOBILE CARDS ---------- */}
-              <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 md:hidden">
                 {paginatedEmployees.map((emp, i) => (
                   <EmployeeCard key={emp._id} emp={emp} i={i} refresh={fetchEmployees} />
                 ))}
@@ -541,11 +543,11 @@ const List = () => {
 
           {/* ================= PAGINATION ================= */}
           {!empLoading && filteredEmployees.length > 0 && (
-            <div className="flex flex-col gap-3 border-t border-red-50 bg-gray-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-3 border-t border-red-50 bg-gray-50/50 px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-center text-xs text-gray-500 sm:text-left">
                 Showing <b className="text-gray-900">{showingFrom}–{showingTo}</b> of <b className="text-gray-900">{filteredEmployees.length}</b>
               </p>
-              <div className="flex items-center justify-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                   disabled={safePage === 1}
@@ -606,14 +608,14 @@ const EmployeeCard = ({ emp, i, refresh }) => (
     animate={{ opacity: 1, y: 0, transition: { delay: i * 0.04 } }}
     exit={{ opacity: 0, scale: 0.97 }}
     whileHover={{ y: -3 }}
-    className={`group overflow-hidden rounded-3xl bg-white ring-1 ring-gray-100 transition-shadow hover:shadow-xl hover:shadow-red-900/5 hover:ring-red-100 ${
+    className={`group min-w-0 overflow-hidden rounded-3xl bg-white ring-1 ring-gray-100 transition-shadow hover:shadow-xl hover:shadow-red-900/5 hover:ring-red-100 ${
       emp.isActive === false ? "opacity-80" : ""
     }`}
   >
-    <div className={`h-1.5 bg-gradient-to-r ${emp.isActive === false ? "from-gray-200 to-gray-300" : colorFor(emp.name)}`} />
-    <div className="p-5">
+    <div className={`h-1 bg-gradient-to-r ${emp.isActive === false ? "from-gray-200 to-gray-300" : colorFor(emp.name)}`} />
+    <div className="p-4 sm:p-5">
       <div className="flex items-start gap-3">
-        <Avatar emp={emp} size="h-14 w-14" text="text-base" />
+        <Avatar emp={emp} size="h-12 w-12 sm:h-14 sm:w-14" text="text-base" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-bold text-gray-900 transition-colors group-hover:text-red-600">{emp.name}</p>
           <p className="truncate text-xs text-gray-500">{emp.designation !== "N/A" ? emp.designation : "No designation"}</p>
@@ -623,8 +625,8 @@ const EmployeeCard = ({ emp, i, refresh }) => (
           </div>
         </div>
       </div>
-      <div className="mt-4 min-w-0"><DeptPill name={emp.dep_name} /></div>
-      <div className="mt-4 flex justify-end border-t border-gray-100 pt-3">
+      <div className="mt-3 min-w-0"><DeptPill name={emp.dep_name} /></div>
+      <div className="mt-3 min-w-0 border-t border-gray-100 pt-3 [&>*]:flex [&>*]:flex-wrap [&>*]:justify-end [&>*]:gap-1.5">
         <EmployeeButtons id={emp._id} isActive={emp.isActive} refresh={refresh} />
       </div>
     </div>

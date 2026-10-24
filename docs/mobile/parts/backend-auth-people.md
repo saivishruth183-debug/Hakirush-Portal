@@ -46,7 +46,7 @@ Modified
 **SessionUser**
 - Built by `buildSessionUser()` and used by login, verify, mobile login and refresh.
 - Removes `password`, `tokenVersion` and `__v`. Keeps `createdAt` and `updatedAt`.
-- Employee fields (`employeeId` code, `designation`, `employeeRecordId`, `departmentId`, `departmentName`) are added for employees, and for admins who have an Employee record.
+- Employee fields (`employeeId` code, `designation`, `gender`, `employeeRecordId`, `departmentId`, `departmentName`) are added for employees, and for admins who have an Employee record. `gender` may be null when not recorded.
 - Clients get `clientId`, and `profileImage` falls back to the company logo (as before).
 
 **Refresh tokens and sessions** (reworked after the external review: two P1 issues)

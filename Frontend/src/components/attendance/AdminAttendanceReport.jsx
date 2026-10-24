@@ -645,8 +645,8 @@ const AdminAttendanceReport = () => {
   const hasFilters = !!search || dataFilter !== today;
 
   return (
-    <div className={`min-h-screen ${PAGE_BG} pb-20 text-gray-900`}>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG} pb-20 text-gray-900`}>
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
 
         {/* HEADER */}
         <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -656,16 +656,16 @@ const AdminAttendanceReport = () => {
           >
             <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" /> Back
           </button>
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
-              <FileSpreadsheet size={26} />
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30 sm:h-14 sm:w-14">
+              <FileSpreadsheet size={24} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Attendance</p>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
                 Report <span className="bg-gradient-to-r from-red-600 to-rose-500 bg-clip-text text-transparent">Archive</span>
               </h1>
-              <p className="text-sm text-gray-500">Look up any day, or download a full month as Excel.</p>
+              <p className="hidden text-sm text-gray-500 sm:block">Look up any day, or download a full month as Excel.</p>
             </div>
           </div>
         </motion.header>
@@ -674,9 +674,9 @@ const AdminAttendanceReport = () => {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
           <form
             onSubmit={(e) => { e.preventDefault(); setSearch(searchInput.trim()); }}
-            className={`${CARD} flex flex-col gap-3 p-4 md:flex-row md:items-end`}
+            className={`${CARD} flex min-w-0 flex-col gap-3 p-3.5 sm:p-4 md:flex-row md:items-end`}
           >
-            <div className="md:w-72">
+            <div className="min-w-0 md:w-[22rem] md:shrink-0">
               <p className="mb-1.5 text-xs font-semibold text-gray-600">Date</p>
               <div className="flex items-center gap-1.5">
                 <button type="button" onClick={() => shiftDay(-1)} aria-label="Previous day"
@@ -707,13 +707,13 @@ const AdminAttendanceReport = () => {
 
             <div className="min-w-0 flex-1">
               <p className="mb-1.5 text-xs font-semibold text-gray-600">Employee</p>
-              <div className="group relative flex items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
+              <div className="group relative flex min-w-0 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
                 <Search size={17} className="text-gray-400 transition group-focus-within:text-red-500" />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search by name or ID, then press Enter…"
-                  className="w-full bg-transparent py-[15px] pl-3 text-sm font-medium text-gray-900 outline-none placeholder:text-gray-400"
+                  placeholder="Name or employee ID…"
+                  className="w-full min-w-0 bg-transparent py-4 pl-3 text-sm font-medium text-gray-900 outline-none placeholder:text-gray-400"
                 />
                 {searchInput && (
                   <button type="button" onClick={() => { setSearchInput(""); if (search) setSearch(""); }} aria-label="Clear search"
@@ -726,7 +726,7 @@ const AdminAttendanceReport = () => {
 
             <div className="flex gap-2">
               <button type="submit"
-                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-6 py-[15px] text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:brightness-110 active:scale-[0.98] md:flex-none">
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:brightness-110 active:scale-[0.98] md:flex-none">
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Search
               </button>
               {hasFilters && (
@@ -739,10 +739,10 @@ const AdminAttendanceReport = () => {
           </form>
 
           {/* MONTHLY EXCEL EXPORT */}
-          <div className={`${CARD} flex flex-col gap-3 p-4`}>
+          <div className={`${CARD} flex min-w-0 flex-col gap-3 p-3.5 sm:p-4`}>
             <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600"><FileSpreadsheet size={13} className="text-emerald-600" /> Monthly Excel export</p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="flex items-center rounded-2xl bg-white ring-1 ring-gray-200">
+              <div className="flex items-center justify-between rounded-2xl bg-white ring-1 ring-gray-200">
                 <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="flex h-12 w-10 items-center justify-center rounded-l-2xl text-gray-500 transition hover:bg-red-50 hover:text-red-600">
                   <ChevronLeft size={16} />
                 </button>
@@ -837,19 +837,19 @@ const AdminAttendanceReport = () => {
             return (
               <motion.section key={date} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className={`${CARD} overflow-hidden`}>
                 {/* DATE STRIP */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-red-600 via-rose-600 to-rose-500 px-5 py-4 text-white sm:px-6">
+                <div className="relative overflow-hidden bg-gradient-to-r from-red-600 via-rose-600 to-rose-500 px-4 py-4 text-white sm:px-6">
                   <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/15 blur-2xl" />
                   <div className="relative flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 flex-col items-center justify-center rounded-2xl bg-white/15 leading-none ring-1 ring-white/25">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-white/15 leading-none ring-1 ring-white/25">
                         <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">{selectedDate.toLocaleDateString("en-IN", { month: "short" })}</span>
                         <span className="text-lg font-extrabold">{selectedDate.getDate()}</span>
                       </div>
-                      <div>
-                        <p className="text-base font-extrabold">
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-extrabold leading-tight sm:text-base">
                           {selectedDate.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
                         </p>
-                        <p className="flex items-center gap-2 text-xs text-white/80">
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/80">
                           {date === today && <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-semibold"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> Today</span>}
                           {!isOffDay && <>{totalDay} employees · {hoursToHHMMSS(totalWorked).slice(0, 5)} h logged{liveNow ? ` · ${liveNow} working now` : ""}</>}
                         </p>
@@ -884,7 +884,7 @@ const AdminAttendanceReport = () => {
                 ) : (
                   <>
                     {/* status chips */}
-                    <div className="-mx-1 flex gap-2 overflow-x-auto border-b border-gray-100 px-5 py-3 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+                    <div className="flex flex-wrap gap-1.5 border-b border-gray-100 px-3 py-3 sm:gap-2 sm:px-6">
                       {[["all", "All", totalDay], ...["Present", "Half Day", "Leave", "Absent", "Unmarked"].map((s) => [s, STATUS_META[s].label, counts[s] || 0])]
                         .filter(([v, , c]) => v === "all" || c > 0)
                         .map(([v, label, c]) => {
@@ -967,12 +967,12 @@ const AdminAttendanceReport = () => {
                     </div>
 
                     {/* MOBILE CARD VIEW */}
-                    <div className="space-y-3 p-4 md:hidden">
+                    <div className="grid grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:p-4 md:hidden">
                       {paginated.map((r, i) => {
                         const status = normalizeStatus(r.status);
                         const meta = STATUS_META[status] || STATUS_META.Unmarked;
                         return (
-                          <div key={r.employeeId + i} className="relative overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                          <div key={r.employeeId + i} className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
                             <span className={`absolute inset-y-0 left-0 w-1.5 ${meta.dot}`} />
                             <div className="flex items-start justify-between gap-3 pl-2">
                               <div className="flex min-w-0 items-center gap-3">
@@ -983,7 +983,7 @@ const AdminAttendanceReport = () => {
                                   <h4 className="truncate font-bold text-gray-900">{r.employeeName}</h4>
                                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                     <span className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-500"><Hash size={9} />{r.employeeId}</span>
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} />{r.departmentName}</span>
+                                    <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} className="shrink-0" /><span className="truncate">{r.departmentName}</span></span>
                                   </div>
                                 </div>
                               </div>
@@ -1003,11 +1003,11 @@ const AdminAttendanceReport = () => {
 
                     {/* PAGINATION */}
                     {filtered.length > 0 && (
-                      <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-4 sm:flex-row sm:justify-between sm:px-6">
+                      <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-3 sm:flex-row sm:p-4 sm:justify-between sm:px-6">
                         <p className="text-xs text-gray-500">
                           Showing <b className="text-gray-900">{startIndex + 1}–{Math.min(startIndex + itemsPerPage, filtered.length)}</b> of <b className="text-gray-900">{filtered.length}</b>
                         </p>
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center justify-center gap-1">
                           <button disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} aria-label="Previous page"
                             className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-500 ring-1 ring-gray-200 transition enabled:hover:text-red-600 enabled:hover:ring-red-200 disabled:opacity-40">
                             <ChevronLeft size={16} />

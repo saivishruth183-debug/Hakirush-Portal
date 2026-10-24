@@ -62,6 +62,33 @@ test("apply: server computes working days (weekends + holidays excluded), client
   assert.equal(asAdmin.status, 403);
 });
 
+test("parental leave is restricted by the employee's recorded gender", async () => {
+  fx.itDev1.employee.gender = "Female";
+  await fx.itDev1.employee.save();
+  fx.itDev2.employee.gender = "Male";
+  await fx.itDev2.employee.save();
+
+  const maternity = await apply(fx.itDev1.user, {
+    leaveType: "Maternity Leave", startDate: "2026-09-21", endDate: "2026-09-21",
+  });
+  assert.equal(maternity.status, 200);
+
+  const maleMaternity = await apply(fx.itDev2.user, {
+    leaveType: "Maternity Leave", startDate: "2026-09-21", endDate: "2026-09-21",
+  });
+  assert.equal(maleMaternity.status, 403);
+
+  const paternity = await apply(fx.itDev2.user, {
+    leaveType: "Paternity Leave", startDate: "2026-09-21", endDate: "2026-09-21",
+  });
+  assert.equal(paternity.status, 200);
+
+  const femalePaternity = await apply(fx.itDev1.user, {
+    leaveType: "Paternity Leave", startDate: "2026-09-22", endDate: "2026-09-22",
+  });
+  assert.equal(femalePaternity.status, 403);
+});
+
 test("overlapping pending/approved leave is rejected with 409", async () => {
   const a = await apply(fx.itDev1.user, { leaveType: "Casual Leave", startDate: "2026-09-14", endDate: "2026-09-16" });
   assert.equal(a.status, 200);

@@ -214,14 +214,14 @@ const AdminAttendance = () => {
   const emptyText = isOffDay && dayStatus ? dayStatus : hasFilters ? "No one matches these filters." : "No records found for today.";
 
   return (
-    <div className={`min-h-screen ${PAGE_BG} pb-20 text-gray-900`}>
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG} pb-20 text-gray-900`}>
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
 
         {/* HEADER SECTION */}
         <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="relative flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
               <Activity size={26} />
               {!isOffDay && liveCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4">
@@ -230,27 +230,27 @@ const AdminAttendance = () => {
                 </span>
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Attendance</p>
               <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
                 Live <span className="bg-gradient-to-r from-red-600 to-rose-500 bg-clip-text text-transparent">Attendance</span>
               </h1>
-              <p className="flex items-center gap-1.5 text-sm text-gray-500">
+              <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500">
                 <CalendarDays size={14} /> {getTodayLabel()}
                 {!isOffDay && liveCount > 0 && <span className="text-emerald-600">· {liveCount} working now</span>}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-            <button type="button" onClick={fetchAttendance} disabled={loading} aria-label="Refresh"
-              className="col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-60 sm:col-span-1">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={fetchAttendance} disabled={loading} aria-label="Refresh" title="Refresh"
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white text-sm font-bold text-gray-600 shadow-sm ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-60 lg:w-auto lg:px-4">
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-              <span className="sm:hidden lg:inline">Refresh</span>
+              <span className="hidden lg:inline">Refresh</span>
             </button>
             <Link
               to="/admin-dashboard/attendance-requests"
-              className="relative inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:text-red-600 hover:ring-red-200"
+              className="relative inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-gray-700 sm:flex-none shadow-sm ring-1 ring-gray-200 transition hover:-translate-y-0.5 hover:text-red-600 hover:ring-red-200"
             >
               <MessageSquareText size={16} />
               <span>Requests</span>
@@ -262,7 +262,7 @@ const AdminAttendance = () => {
             </Link>
             <Link
               to="/admin-dashboard/attendance-report"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:brightness-110"
+              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-5 text-sm font-bold text-white sm:flex-none shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:brightness-110"
             >
               <FileText size={16} />
               <span>Archive</span>
@@ -287,7 +287,7 @@ const AdminAttendance = () => {
         {/* STATS */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            className="col-span-2 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-[0_20px_50px_-15px_rgba(220,38,38,0.55)] lg:col-span-1 lg:row-span-1">
+            className="col-span-2 flex min-w-0 flex-col justify-center overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white sm:p-5 shadow-[0_20px_50px_-15px_rgba(220,38,38,0.55)] lg:col-span-1 lg:row-span-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-white/80">Attendance today</p>
             {loading && !total ? <div className="mt-2 h-9 w-20 animate-pulse rounded bg-white/30" /> :
               <p className="mt-1 text-4xl font-extrabold tracking-tight">{pct(presentCount)}%</p>}
@@ -300,38 +300,48 @@ const AdminAttendance = () => {
             <p className="mt-2 text-[11px] text-white/80">{presentCount} of {total} present{halfDayCount ? ` · ${halfDayCount} half day` : ""}</p>
           </motion.div>
           {[
-            ["Personnel", total, Users, "from-slate-600 to-slate-800"],
-            ["Present", presentCount, UserCheck, "from-emerald-500 to-teal-400"],
-            ["Absent", absentCount, UserX, "from-red-500 to-rose-400"],
-            ["On leave", leaveCount, Plane, "from-amber-500 to-orange-400"],
-          ].map(([label, value, Icon, tone], i) => (
-            <motion.div key={label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
-              className={`${CARD} flex items-center gap-3 p-4`}>
-              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-md`}>
-                <Icon size={19} />
+            ["Personnel", total, Users, "from-slate-600 to-slate-800", "bg-slate-500"],
+            ["Present", presentCount, UserCheck, "from-emerald-500 to-teal-400", "bg-emerald-500"],
+            ["Absent", absentCount, UserX, "from-red-500 to-rose-400", "bg-red-500"],
+            ["On leave", leaveCount, Plane, "from-amber-500 to-orange-400", "bg-amber-400"],
+          ].map(([label, value, Icon, tone, bar], i) => (
+            <motion.button type="button" key={label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
+              onClick={() => { setStatusFilter(label === "Personnel" ? "all" : label === "On leave" ? "leave" : label.toLowerCase()); setCurrentPage(1); }}
+              className={`${CARD} flex min-w-0 flex-col justify-between gap-3 p-3.5 text-left transition hover:-translate-y-0.5 sm:p-4 ${
+                statusFilter === (label === "Personnel" ? "all" : label === "On leave" ? "leave" : label.toLowerCase()) ? "!ring-2 !ring-red-300" : ""
+              }`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br sm:h-10 sm:w-10 ${tone} text-white shadow-md`}>
+                  <Icon size={17} />
+                </div>
+                <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
               </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
-                {loading && !total ? <div className="mt-1 h-5 w-10 animate-pulse rounded bg-gray-200" /> :
-                  <p className="text-xl font-extrabold tracking-tight text-gray-900">{value}
-                    {label !== "Personnel" && total > 0 && <span className="ml-1.5 text-xs font-semibold text-gray-400">{pct(value)}%</span>}
-                  </p>}
+              <div>
+                {loading && !total ? <div className="h-7 w-12 animate-pulse rounded bg-gray-200" /> : (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-2xl font-extrabold tracking-tight tabular-nums text-gray-900 sm:text-3xl">{value}</p>
+                    {label !== "Personnel" && total > 0 && <span className="text-xs font-bold tabular-nums text-gray-400">{pct(value)}%</span>}
+                  </div>
+                )}
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                  <motion.div className={`h-full rounded-full ${bar}`} initial={{ width: 0 }} animate={{ width: `${label === "Personnel" ? (total ? 100 : 0) : pct(value)}%` }} transition={{ duration: 0.8 }} />
+                </div>
               </div>
-            </motion.div>
+            </motion.button>
           ))}
         </div>
 
         {/* MAIN CARD */}
         <div className={`${CARD} overflow-hidden`}>
           {/* Toolbar */}
-          <div className="space-y-4 border-b border-gray-100 p-4 sm:p-5">
+          <div className="space-y-3 border-b border-gray-100 p-3 sm:space-y-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="group relative flex flex-1 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
+              <div className="group relative flex min-w-0 flex-1 items-center rounded-2xl bg-gray-50 px-4 ring-1 ring-gray-200 transition focus-within:bg-white focus-within:ring-2 focus-within:ring-red-400">
                 <Search size={17} className="text-gray-400 transition group-focus-within:text-red-500" />
                 <input
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-                  placeholder="Search by name, employee ID or department…"
+                  placeholder="Search name, ID or department…"
                   className="w-full bg-transparent py-3 pl-3 text-sm font-medium text-gray-900 outline-none placeholder:text-gray-400"
                 />
                 {search && (
@@ -341,21 +351,21 @@ const AdminAttendance = () => {
                 )}
               </div>
               {lastSynced && (
-                <span className="flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-400">
+                <span className="hidden items-center gap-1.5 whitespace-nowrap text-xs text-gray-400 sm:flex">
                   <Timer size={13} /> Synced {lastSynced.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
             </div>
 
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
               {FILTERS.map(([v, label, count, Icon]) => {
                 const active = statusFilter === v;
                 return (
                   <button key={label} onClick={() => { setStatusFilter(v); setCurrentPage(1); }}
-                    className={`relative flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${active ? "text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:text-red-600 hover:ring-red-200"}`}>
+                    className={`relative flex min-w-0 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-[11px] font-semibold transition sm:shrink-0 sm:justify-start sm:gap-2 sm:px-3.5 sm:text-xs ${active ? "text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:text-red-600 hover:ring-red-200"}`}>
                     {active && <motion.span layoutId="att-chip" className="absolute inset-0 rounded-full bg-gradient-to-r from-red-600 to-rose-500 shadow shadow-red-600/30" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
-                    <Icon size={13} className="relative" />
-                    <span className="relative">{label}</span>
+                    <Icon size={13} className="relative hidden shrink-0 sm:block" />
+                    <span className="relative truncate">{label}</span>
                     <span className={`relative rounded-full px-1.5 text-[10px] ${active ? "bg-white/25" : "bg-gray-100 text-gray-500"}`}>{count}</span>
                   </button>
                 );
@@ -465,12 +475,12 @@ const AdminAttendance = () => {
               </div>
 
               {/* MOBILE VIEW */}
-              <div className="space-y-3 p-4 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 md:hidden">
                 {paginated.length > 0 ? paginated.map((a, i) => {
                   const meta = metaFor(a.status);
                   return (
                     <motion.div key={a.employeeMongoId} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.04 }}
-                      className="relative overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+                      className="relative min-w-0 overflow-hidden rounded-3xl bg-white p-3.5 shadow-sm ring-1 ring-gray-100">
                       <span className={`absolute inset-y-0 left-0 w-1.5 ${meta.bar}`} />
                       <div className="flex items-start justify-between gap-3 pl-2">
                         <div className="flex min-w-0 items-center gap-3">
@@ -481,7 +491,7 @@ const AdminAttendance = () => {
                             <h3 className="truncate font-bold text-gray-900">{a.name}</h3>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               <span className="inline-flex items-center gap-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-gray-500"><Hash size={9} />{a.employeeCode}</span>
-                              <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} />{a.department}</span>
+                              <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500"><Briefcase size={9} className="shrink-0" /><span className="truncate">{a.department}</span></span>
                             </div>
                           </div>
                         </div>
@@ -495,7 +505,7 @@ const AdminAttendance = () => {
                         </div>
                         <TimerPill a={a} compact />
                       </div>
-                      <div className="mt-3 border-t border-gray-100 pl-2 pt-3">
+                      <div className="mt-3 min-w-0 border-t border-gray-100 pl-2 pt-3 [&>*]:flex-wrap">
                         <AttendanceHelper
                           employeeId={a.employeeMongoId}
                           status={a.status}
@@ -513,11 +523,11 @@ const AdminAttendance = () => {
 
               {/* PAGINATION */}
               {sorted.length > 0 && (
-                <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-4 sm:flex-row sm:justify-between sm:px-6">
+                <div className="flex flex-col items-center gap-3 border-t border-gray-100 bg-gray-50/50 p-3 sm:flex-row sm:p-4 sm:justify-between sm:px-6">
                   <p className="text-xs text-gray-500">
                     Showing <b className="text-gray-900">{startIndex + 1}–{Math.min(startIndex + itemsPerPage, sorted.length)}</b> of <b className="text-gray-900">{sorted.length}</b>
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                       disabled={currentPage === 1}

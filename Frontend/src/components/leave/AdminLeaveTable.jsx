@@ -142,6 +142,7 @@ const MobileLeaveCard = ({ leave, index, handleView }) => {
           <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
             {shortDate(leave.startDate)} <ArrowRight size={11} className="text-gray-300" /> {shortDate(leave.endDate)}
           </p>
+          {leave.compOffFor && <p className="mt-0.5 text-[11px] font-semibold text-sky-600">Worked on {shortDate(leave.compOffFor)}</p>}
         </div>
         <div className="text-right">
           <p className="text-2xl font-extrabold leading-none text-gray-900 tabular-nums">{leave.days}</p>
@@ -218,7 +219,8 @@ const AdminLeaveTable = () => {
               status: leave.status,
               startDate: leave.startDate,
               endDate: leave.endDate,
-              reason: leave.reason
+              reason: leave.reason,
+              compOffFor: leave.compOffFor || null,
             };
           });
         setLeaves(data);
@@ -493,6 +495,8 @@ const AdminLeaveTable = () => {
                           </td>
                           <td className="px-3 py-3.5">
                             <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${typeTone(leave.leaveType)}`}>{leave.leaveType || "—"}</span>
+                            {leave.compOffFor && <p className="mt-1 text-[11px] font-semibold text-sky-600">Worked {shortDate(leave.compOffFor)}</p>}
+                            {leave.leaveType === "Loss of Pay" && <p className="mt-1 text-[11px] font-semibold text-slate-500">Unpaid</p>}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3.5">
                             <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800">

@@ -300,7 +300,7 @@ const AdminAssets = () => {
     ) : <span className="text-xs text-gray-300">—</span>;
 
   return (
-    <div className={`min-h-screen ${PAGE_BG}`}>
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG}`}>
       {/* ---------- overlays ---------- */}
       <AnimatePresence>
         {showAdd && (
@@ -473,28 +473,28 @@ const AdminAssets = () => {
         document.body
       )}
 
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
         {/* HEADER */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+        <header className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
               <Boxes size={26} />
             </div>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Company assets</h1>
-              <p className="text-sm text-gray-500">Track equipment and who has it.</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Company assets</h1>
+              <p className="truncate text-xs text-gray-500 sm:text-sm">Track equipment and who has it.</p>
             </div>
           </div>
           <button onClick={() => setShowAdd(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]">
-            <Plus size={17} strokeWidth={2.5} /> New asset
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] sm:gap-2 sm:px-6">
+            <Plus size={17} strokeWidth={2.5} /> <span className="hidden sm:inline">New asset</span><span className="sm:hidden">New</span>
           </button>
         </header>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-4">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            className="relative col-span-2 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-xl shadow-red-600/25 lg:col-span-1">
+            className="relative col-span-3 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white shadow-xl shadow-red-600/25 sm:p-5 lg:col-span-1">
             <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
             <p className="relative text-[11px] font-semibold uppercase tracking-wider text-white/80">In use</p>
             <p className="relative mt-2 text-3xl font-extrabold tabular-nums">{loading ? "–" : `${utilisation}%`}</p>
@@ -510,22 +510,22 @@ const AdminAssets = () => {
           ].map((s, i) => (
             <motion.button type="button" key={s.key} onClick={() => { setStatusTab(s.key); resetPage(); }}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
-              className={`${CARD} p-4 text-left transition hover:-translate-y-0.5 sm:p-5 ${statusTab === s.key && s.key !== "All" ? "ring-2 ring-red-300" : ""}`}>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.tone}`}><s.Icon size={17} /></div>
-              <p className="mt-3 text-2xl font-extrabold tabular-nums text-gray-900">{loading ? "–" : s.value}</p>
-              <p className="text-xs font-semibold text-gray-500">{s.label}</p>
+              className={`${CARD} min-w-0 p-3 text-left transition hover:-translate-y-0.5 sm:p-5 ${statusTab === s.key && s.key !== "All" ? "ring-2 ring-red-300" : ""}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl sm:h-9 sm:w-9 ${s.tone}`}><s.Icon size={16} /></div>
+              <p className="mt-2 text-xl font-extrabold tabular-nums text-gray-900 sm:mt-3 sm:text-2xl">{loading ? "–" : s.value}</p>
+              <p className="truncate text-[11px] font-semibold text-gray-500 sm:text-xs">{s.label}</p>
             </motion.button>
           ))}
         </div>
 
         {/* TYPE FILTER */}
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {[{ value: "All", Icon: Boxes }, ...TYPES].map(({ value, Icon }) => {
             const on = typeFilter === value;
             const n = value === "All" ? counts.All : typeCounts[value] || 0;
             return (
               <button key={value} onClick={() => { setTypeFilter(value); resetPage(); }}
-                className={`flex shrink-0 items-center gap-2 rounded-2xl px-3.5 py-2.5 text-sm font-semibold transition ${on ? "bg-gray-900 text-white shadow-lg" : "bg-white/90 text-gray-600 ring-1 ring-gray-200 hover:text-red-600 hover:ring-red-200"}`}>
+                className={`flex shrink-0 items-center gap-1.5 rounded-2xl px-3 py-2 text-[13px] font-semibold transition sm:gap-2 sm:px-3.5 sm:py-2.5 sm:text-sm ${on ? "bg-gray-900 text-white shadow-lg" : "bg-white/90 text-gray-600 ring-1 ring-gray-200 hover:text-red-600 hover:ring-red-200"}`}>
                 <Icon size={16} /> {value === "All" ? "All types" : value}
                 <span className={`rounded-full px-1.5 text-[11px] font-bold ${on ? "bg-white/20" : "bg-gray-100 text-gray-500"}`}>{n}</span>
               </button>
@@ -535,17 +535,17 @@ const AdminAssets = () => {
 
         {/* LIST */}
         <div className={`${CARD} overflow-hidden`}>
-          <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="-mx-1 overflow-x-auto px-1">
-              <div className="flex w-max gap-1 rounded-2xl bg-gray-100/80 p-1">
+          <div className="flex flex-col gap-3 border-b border-gray-100 p-3 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="grid grid-cols-2 gap-1 rounded-2xl bg-gray-100/80 p-1 sm:flex sm:w-max">
                 {TABS.map((t) => (
                   <button key={t.key} onClick={() => { setStatusTab(t.key); resetPage(); }}
-                    className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold transition ${statusTab === t.key ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
+                    className={`relative flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1.5 py-2 text-[13px] font-semibold transition sm:flex-none sm:gap-1.5 sm:px-4 sm:text-sm ${statusTab === t.key ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
                     {statusTab === t.key && (
                       <motion.span layoutId="asset-tab" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow-md shadow-red-600/25"
                         transition={{ type: "spring", stiffness: 400, damping: 32 }} />
                     )}
-                    <span className="relative">{t.label}</span>
+                    <span className="relative truncate">{t.label}</span>
                     <span className={`relative rounded-full px-1.5 text-[11px] font-bold ${statusTab === t.key ? "bg-white/25" : "bg-white text-gray-500"}`}>{counts[t.key]}</span>
                   </button>
                 ))}
@@ -597,12 +597,12 @@ const AdminAssets = () => {
           ) : (
             <>
               {/* MOBILE */}
-              <div className="space-y-3 p-4 md:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 md:hidden">
                 {pageItems.map((asset) => {
                   const m = metaFor(asset.status);
                   return (
                     <motion.div key={asset._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      className="relative overflow-hidden rounded-2xl bg-white p-4 ring-1 ring-gray-100">
+                      className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3.5 ring-1 ring-gray-100">
                       <span className={`absolute inset-y-0 left-0 w-1 ${m.strip}`} />
                       <div className="flex items-start gap-3">
                         <TypeTile type={asset.assetType} />
@@ -685,8 +685,8 @@ const AdminAssets = () => {
               </div>
 
               {/* PAGINATION */}
-              <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+              <div className="flex flex-col gap-3 border-t border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 sm:px-6">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-gray-500 sm:justify-start">
                   <span>Showing <b className="text-gray-900">{start + 1}–{Math.min(start + perPage, visible.length)}</b> of <b className="text-gray-900">{visible.length}</b></span>
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-400">Per page</span>
@@ -697,7 +697,7 @@ const AdminAssets = () => {
                   </div>
                 </div>
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button onClick={() => setPage(Math.max(cur - 1, 1))} disabled={cur === 1} aria-label="Previous page"
                       className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronLeft size={16} /></button>
                     {pageList(totalPages, cur).map((p, i) =>

@@ -108,6 +108,35 @@ test("approve: no fabricated timestamps, nominal hours, audit fields; second rev
   assert.equal(badId.status, 400);
 });
 
+test("team attendance requests are department-scoped and managers can review them", async () => {
+  const inTeam = await create(fx.itDev1.user, {
+    date: "2026-09-14", requestedStatus: "Present", reason: "Forgot to punch in",
+  });
+  const outsideTeam = await create(fx.opsStaff1.user, {
+    date: "2026-09-14", requestedStatus: "Present", reason: "Client meeting",
+  });
+
+  const team = await request(app).get("/api/attendance-request/team").set(auth(fx.itManager.user));
+  assert.equal(team.status, 200);
+  assert.equal(team.body.requests.length, 1);
+  assert.equal(String(team.body.requests[0]._id), inTeam.body.request._id);
+  assert.equal(team.body.requests[0].employeeId.userId.name, "Alan Dev");
+
+  const allStatuses = await request(app).get("/api/attendance-request/team?status=All").set(auth(fx.itManager.user));
+  assert.equal(allStatuses.body.requests.length, 1);
+
+  const adminAsTeam = await request(app).get("/api/attendance-request/team").set(auth(fx.admin));
+  assert.equal(adminAsTeam.status, 403);
+
+  const forbiddenReview = await review(fx.itManager.user, outsideTeam.body.request._id, { decision: "Approved" });
+  assert.equal(forbiddenReview.status, 403);
+  const approved = await review(fx.itManager.user, inTeam.body.request._id, { decision: "Approved" });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.body.request.status, "Approved");
+  const attendance = await Attendance.findOne({ employeeId: fx.itDev1.employee._id, date: "2026-09-14" });
+  assert.equal(attendance.status, "Present");
+});
+
 test("Half Day approval keeps real punches and records punched hours", async () => {
   const checkIn = ist("2026-09-14 09:00");
   const checkOut = ist("2026-09-14 11:00");
@@ -213,4 +242,3 @@ test("employee with unclosed check-in can regularize or have Present approved", 
   assert.equal(att.checkIn.toISOString(), checkIn.toISOString());
   assert.equal(att.checkOut, null);
 });
-

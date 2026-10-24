@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, ChevronRight, Search, ClipboardList, PlusCircle, Calendar, Info, XCircle, AlertTriangle, Check,
   Clock3, CheckCircle2, Ban, X, Loader2, ArrowRight, Umbrella, Stethoscope, Plane, Baby, Briefcase, RefreshCw,
-  CalendarX2, Quote, ChevronDown,
+  CalendarX2, Quote, ChevronDown, HeartHandshake, Repeat, Wallet,
 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/authContext";
@@ -31,7 +31,10 @@ const typeIcon = (t = "") => {
   if (s.includes("sick") || s.includes("medical")) return Stethoscope;
   if (s.includes("casual")) return Umbrella;
   if (s.includes("annual") || s.includes("vacation") || s.includes("earned")) return Plane;
-  if (s.includes("maternity") || s.includes("paternity")) return Baby;
+  if (s.includes("maternity")) return Baby;
+  if (s.includes("paternity")) return HeartHandshake;
+  if (s.includes("comp")) return Repeat;
+  if (s.includes("loss of pay") || s.includes("lop")) return Wallet;
   return Briefcase;
 };
 
@@ -49,7 +52,7 @@ const Modal = ({ children, onClose, dismissable = true }) => {
       <motion.div role="dialog" aria-modal="true"
         initial={{ y: 40, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 30, opacity: 0, scale: 0.97 }}
         transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100">
+        className="relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100">
         {children}
       </motion.div>
     </motion.div>,
@@ -331,8 +334,8 @@ const EmployeeLeaveList = () => {
           {successMessage && !modalState && (
             <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
               className="fixed inset-x-0 bottom-5 z-[110] flex justify-center px-4">
-              <div className="flex items-center gap-3 rounded-2xl bg-gray-900 py-3 pl-4 pr-2 text-sm font-semibold text-white shadow-2xl">
-                <CheckCircle2 size={18} className="text-emerald-400" /> {successMessage}
+              <div className="flex max-w-full items-center gap-3 rounded-2xl bg-gray-900 py-3 pl-4 pr-2 text-sm font-semibold text-white shadow-2xl">
+                <CheckCircle2 size={18} className="shrink-0 text-emerald-400" /> <span className="min-w-0">{successMessage}</span>
                 <button onClick={() => setSuccessMessage("")} aria-label="Dismiss" className="rounded-lg p-1 text-white/60 hover:bg-white/10 hover:text-white"><X size={15} /></button>
               </div>
             </motion.div>
@@ -341,16 +344,16 @@ const EmployeeLeaveList = () => {
         document.body
       )}
 
-      <div className={`min-h-screen ${PAGE_BG} pb-12`}>
-        <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className={`min-h-screen w-full overflow-x-hidden ${PAGE_BG} pb-12`}>
+        <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
 
           {/* HEADER */}
           <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
                 <ClipboardList size={26} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">{user.role === "employee" ? "My leaves" : "Leave records"}</h1>
                 <p className="text-sm text-gray-500">Requests, approvals and history</p>
               </div>
@@ -358,7 +361,7 @@ const EmployeeLeaveList = () => {
             {user.role === "employee" && (
               <Link
                 to="/employee-dashboard/add-leave"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98]"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-600 to-rose-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:-translate-y-0.5 sm:w-auto hover:brightness-110 active:scale-[0.98]"
               >
                 <PlusCircle size={17} /> Request leave
               </Link>
@@ -366,17 +369,30 @@ const EmployeeLeaveList = () => {
           </header>
 
           {/* STATS */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              className="relative col-span-2 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-white shadow-xl shadow-red-600/25 lg:col-span-1">
+              className="relative col-span-2 min-w-0 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-white sm:p-5 shadow-xl shadow-red-600/25 lg:col-span-1">
               <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
               <p className="relative text-[11px] font-semibold uppercase tracking-wider text-white/80">Days taken in {year}</p>
-              <p className="relative mt-2 text-4xl font-extrabold tabular-nums">{loading ? "–" : daysTakenThisYear}</p>
+              <p className="relative mt-2 text-3xl font-extrabold tabular-nums sm:text-4xl">{loading ? "–" : daysTakenThisYear}</p>
               <div className="relative mt-2 flex flex-wrap gap-1.5">
                 {Object.entries(byType).slice(0, 3).map(([t, d]) => (
-                  <span key={t} className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold ring-1 ring-white/20">{t}: {d}</span>
+                  <span key={t} className="max-w-full truncate rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold ring-1 ring-white/20">{t}: {d}</span>
                 ))}
                 {!Object.keys(byType).length && !loading && <span className="text-xs text-white/80">No approved leave yet</span>}
+              </div>
+              <div className="relative mt-4 grid grid-cols-2 gap-2 sm:hidden">
+                {[
+                  { key: "pending", label: "Awaiting", value: counts.pending, Icon: Clock3 },
+                  { key: "approved", label: "Approved", value: counts.approved, Icon: CheckCircle2 },
+                ].map((s) => (
+                  <button key={s.key} type="button" onClick={() => { setStatusTab(s.key); setCurrentPage(1); }}
+                    className={`flex items-center gap-2 rounded-2xl px-3 py-2 text-left ring-1 transition ${statusTab === s.key ? "bg-white text-red-700 ring-white" : "bg-white/15 ring-white/20"}`}>
+                    <s.Icon size={16} className="shrink-0" />
+                    <span className="text-lg font-extrabold tabular-nums leading-none">{loading ? "–" : s.value}</span>
+                    <span className="truncate text-[11px] font-semibold opacity-90">{s.label}</span>
+                  </button>
+                ))}
               </div>
             </motion.div>
             {[
@@ -385,19 +401,19 @@ const EmployeeLeaveList = () => {
             ].map((s, i) => (
               <motion.button type="button" key={s.key} onClick={() => { setStatusTab(s.key); setCurrentPage(1); }}
                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
-                className={`${CARD} p-4 text-left transition hover:-translate-y-0.5 sm:p-5 ${statusTab === s.key ? "ring-2 ring-red-300" : ""}`}>
+                className={`${CARD} hidden min-w-0 p-3.5 text-left transition hover:-translate-y-0.5 sm:block sm:p-5 ${statusTab === s.key ? "ring-2 ring-red-300" : ""}`}>
                 <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.tone}`}><s.Icon size={17} /></div>
                 <p className="mt-3 text-2xl font-extrabold tabular-nums text-gray-900">{loading ? "–" : s.value}</p>
-                <p className="text-xs font-semibold text-gray-500">{s.label}</p>
+                <p className="truncate text-xs font-semibold text-gray-500">{s.label}</p>
               </motion.button>
             ))}
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-              className={`${CARD} col-span-2 p-4 sm:p-5 lg:col-span-1`}>
+              className={`${CARD} col-span-2 min-w-0 px-4 py-3 sm:p-5 lg:col-span-1`}>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Next leave</p>
               {nextLeave ? (
                 <div className="mt-2 flex items-center gap-3">
                   <DateBadge date={nextLeave.startDate} />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-gray-900">{nextLeave.leaveType}</p>
                     <p className="text-xs text-gray-500">{nextLeave.days} day{Number(nextLeave.days) === 1 ? "" : "s"} · {nextLeave.status}</p>
                     {whenLabel(nextLeave) && <p className="mt-0.5 text-xs font-semibold text-red-600">{whenLabel(nextLeave).text}</p>}
@@ -412,17 +428,17 @@ const EmployeeLeaveList = () => {
           {/* MAIN CONTAINER */}
           <div className={`${CARD} overflow-hidden`}>
             {/* toolbar */}
-            <div className="flex flex-col gap-3 border-b border-gray-100 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="-mx-1 overflow-x-auto px-1">
-                <div className="flex w-max gap-1 rounded-2xl bg-gray-100/80 p-1">
+            <div className="flex min-w-0 flex-col gap-3 border-b border-gray-100 p-3 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="-mx-1 min-w-0 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-cols-5 gap-1 rounded-2xl bg-gray-100/80 p-1 sm:flex sm:w-max">
                   {TABS.map((t) => (
                     <button key={t.key} onClick={() => { setStatusTab(t.key); setCurrentPage(1); }}
-                      className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition ${statusTab === t.key ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
+                      className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-xl px-0.5 py-1.5 text-[11px] sm:flex-row sm:gap-1.5 sm:px-3.5 sm:py-2 sm:text-sm font-semibold transition ${statusTab === t.key ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
                       {statusTab === t.key && (
                         <motion.span layoutId="leave-tab" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow-md shadow-red-600/25"
                           transition={{ type: "spring", stiffness: 400, damping: 32 }} />
                       )}
-                      <span className="relative">{t.label}</span>
+                      <span className="relative max-w-full truncate">{t.label}</span>
                       <span className={`relative rounded-full px-1.5 text-[11px] font-bold ${statusTab === t.key ? "bg-white/25" : t.key === "pending" && counts.pending ? "bg-amber-400 text-white" : "bg-white text-gray-500"}`}>{counts[t.key]}</span>
                     </button>
                   ))}
@@ -445,9 +461,9 @@ const EmployeeLeaveList = () => {
             </div>
 
             {error && (
-              <div className="flex items-center gap-3 border-b border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700">
+              <div className="flex flex-wrap items-center gap-2 border-b border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:gap-3 sm:px-5">
                 <AlertTriangle size={16} className="shrink-0" />
-                <span className="flex-1">{error}</span>
+                <span className="min-w-0 flex-1 break-words">{error}</span>
                 <button onClick={fetchData} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100"><RefreshCw size={12} /> Retry</button>
                 <button onClick={() => setError(null)} aria-label="Dismiss" className="rounded-lg p-1 hover:bg-red-100"><X size={15} /></button>
               </div>
@@ -477,7 +493,7 @@ const EmployeeLeaveList = () => {
             ) : (
               <>
                 {/* MOBILE VIEW */}
-                <div className="space-y-3 p-4 lg:hidden">
+                <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
                   {currentItems.map((leave) => {
                     const t = themeFor(leave.status);
                     const TIcon = typeIcon(leave.leaveType);
@@ -485,25 +501,28 @@ const EmployeeLeaveList = () => {
                     const w = whenLabel(leave);
                     return (
                       <motion.div key={leave._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                        className={`relative overflow-hidden rounded-2xl bg-white p-4 ring-1 ring-gray-100 ${muted ? "opacity-80" : ""}`}>
+                        className={`relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 pl-4 ring-1 ring-gray-100 ${muted ? "opacity-80" : ""}`}>
                         <span className={`absolute inset-y-0 left-0 w-1 ${t.strip}`} />
-                        <div className="flex items-start gap-3">
-                          <DateBadge date={leave.startDate} muted={muted} />
+                        <div className="flex items-center gap-3">
+                          <DateBadge date={leave.startDate} size="sm" muted={muted} />
                           <div className="min-w-0 flex-1">
-                            <p className="flex items-center gap-1.5 truncate font-bold text-gray-900"><TIcon size={14} className="shrink-0 text-red-500" /><Highlight text={leave.leaveType} q={q} /></p>
-                            <p className="mt-0.5 text-xs text-gray-500">{formatDate(leave.startDate)} → {formatDate(leave.endDate)}</p>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              <StatusChip status={leave.status} />
-                              {w && !muted && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${w.tone}`}>{w.text}</span>}
-                            </div>
+                            <p className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-gray-900"><TIcon size={13} className="shrink-0 text-red-500" /><span className="min-w-0 truncate"><Highlight text={leave.leaveType} q={q} /></span></p>
+                            <p className="mt-0.5 truncate text-xs text-gray-500">{formatDate(leave.startDate)} → {formatDate(leave.endDate)}</p>
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-2xl font-extrabold leading-none tabular-nums text-gray-900">{leave.days}</p>
-                            <p className="text-[10px] font-semibold uppercase text-gray-400">day{Number(leave.days) === 1 ? "" : "s"}</p>
+                          <div className="shrink-0 rounded-xl bg-gray-50 px-2.5 py-1.5 text-center ring-1 ring-gray-100">
+                            <p className="text-base font-extrabold leading-none tabular-nums text-gray-900">{leave.days}</p>
+                            <p className="mt-0.5 text-[9px] font-semibold uppercase text-gray-400">day{Number(leave.days) === 1 ? "" : "s"}</p>
                           </div>
                         </div>
-                        {leave.reason && <p className="mt-3 line-clamp-2 rounded-xl bg-gray-50 p-2.5 text-xs text-gray-600"><Highlight text={leave.reason} q={q} /></p>}
-                        {canCancel(leave) && <div className="mt-3"><CancelBtn leave={leave} full /></div>}
+                        {leave.reason && <p className="mt-2 truncate text-xs text-gray-500" title={leave.reason}><Highlight text={leave.reason} q={q} /></p>}
+                        {leave.compOffFor && <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-sky-700"><Repeat size={11} /> Worked on {formatDate(leave.compOffFor)}</p>}
+                        <div className="mt-2.5 flex items-center gap-1.5 border-t border-gray-50 pt-2.5">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                            <StatusChip status={leave.status} />
+                            {w && !muted && <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${w.tone}`}>{w.text}</span>}
+                          </div>
+                          <CancelBtn leave={leave} />
+                        </div>
                       </motion.div>
                     );
                   })}
@@ -577,6 +596,8 @@ const EmployeeLeaveList = () => {
                                         <div className="flex-1">
                                           <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400"><Quote size={11} /> Reason</p>
                                           <p className="whitespace-pre-line text-sm text-gray-700">{leave.reason || "No reason provided"}</p>
+                                          {leave.compOffFor && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-100"><Repeat size={12} /> For the day you worked: {formatDate(leave.compOffFor)}</p>}
+                                          {leave.leaveType === "Loss of Pay" && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"><Wallet size={12} /> Unpaid, deducted from salary</p>}
                                         </div>
                                         <div className="flex gap-2 sm:w-72">
                                           {[["From", formatDate(leave.startDate)], ["To", formatDate(leave.endDate)], ["Days", leave.days]].map(([l, v]) => (
@@ -600,8 +621,8 @@ const EmployeeLeaveList = () => {
                 </div>
 
                 {/* PAGINATION */}
-                <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                <div className="flex flex-col gap-3 border-t border-gray-100 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 sm:px-6">
+                  <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-gray-500 sm:justify-start">
                     <span>Showing <b className="text-gray-900">{(page - 1) * itemsPerPage + 1}–{Math.min(page * itemsPerPage, processedData.length)}</b> of <b className="text-gray-900">{processedData.length}</b></span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-400">Per page</span>
@@ -612,20 +633,20 @@ const EmployeeLeaveList = () => {
                     </div>
                   </div>
                   {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex flex-wrap items-center justify-center gap-1">
                       <button onClick={() => setCurrentPage(Math.max(page - 1, 1))} disabled={page === 1} aria-label="Previous page"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronLeft size={16} /></button>
+                        className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronLeft size={16} /></button>
                       {pageList(totalPages, page).map((p, i) =>
                         p === "…" ? <span key={`g${i}`} className="w-6 text-center text-gray-400">…</span> : (
                           <button key={p} onClick={() => setCurrentPage(p)}
-                            className={`relative h-9 min-w-9 rounded-xl px-2 text-sm font-bold transition ${p === page ? "text-white" : "text-gray-600 hover:bg-gray-100"}`}>
+                            className={`relative h-8 min-w-8 rounded-xl px-2 text-sm sm:h-9 sm:min-w-9 font-bold transition ${p === page ? "text-white" : "text-gray-600 hover:bg-gray-100"}`}>
                             {p === page && <motion.span layoutId="leave-page" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow-md shadow-red-600/25" />}
                             <span className="relative">{p}</span>
                           </button>
                         )
                       )}
                       <button onClick={() => setCurrentPage(Math.min(page + 1, totalPages))} disabled={page === totalPages} aria-label="Next page"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronRight size={16} /></button>
+                        className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronRight size={16} /></button>
                     </div>
                   )}
                 </div>

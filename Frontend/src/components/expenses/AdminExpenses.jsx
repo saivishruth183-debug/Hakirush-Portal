@@ -90,7 +90,7 @@ const Modal = ({ children, onClose, dismissable = true, wide = false }) => {
       <motion.div role="dialog" aria-modal="true"
         initial={{ y: 40, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 30, opacity: 0, scale: 0.97 }}
         transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        className={`relative w-full overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100 ${wide ? "max-w-3xl" : "max-w-md"}`}>
+        className={`relative max-h-[92vh] w-full overflow-y-auto rounded-3xl bg-white shadow-2xl ring-1 ring-gray-100 ${wide ? "max-w-3xl" : "max-w-md"}`}>
         {children}
       </motion.div>
     </motion.div>,
@@ -295,7 +295,7 @@ const AdminExpenses = () => {
   };
 
   return (
-    <div className={`min-h-screen ${PAGE_BG}`}>
+    <div className={`min-h-screen overflow-x-hidden ${PAGE_BG}`}>
       {/* ---------- overlays ---------- */}
       <AnimatePresence>
         {confirm && (
@@ -336,23 +336,23 @@ const AdminExpenses = () => {
         document.body
       )}
 
-      <div className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto w-full max-w-[1400px] space-y-5 p-3 sm:space-y-6 sm:p-6 lg:p-8">
         {/* HEADER */}
-        <header className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
+        <header className="flex items-center gap-3 sm:gap-4">
+          <div className="flex h-12 w-12 shrink-0 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-rose-500 text-white shadow-lg shadow-red-600/30">
             <Receipt size={26} />
           </div>
           <div className="min-w-0">
             <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Expense claims</h1>
-            <p className="text-sm text-gray-500">Approved amounts are added to the employee's next payslip automatically.</p>
+            <p className="text-xs text-gray-500 sm:text-sm">Approved amounts are added to the employee's next payslip automatically.</p>
           </div>
         </header>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-4">
           <motion.button type="button" onClick={() => { setFilterStatus("Pending"); resetPage(); }}
             initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            className="relative col-span-2 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-5 text-left text-white shadow-xl shadow-red-600/25 transition hover:-translate-y-0.5 lg:col-span-1">
+            className="relative col-span-3 overflow-hidden rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-rose-500 p-4 text-left sm:p-5 text-white shadow-xl shadow-red-600/25 transition hover:-translate-y-0.5 lg:col-span-1">
             <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/15 blur-2xl" />
             <p className="relative flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/80"><Clock size={13} /> Waiting for review</p>
             <p className="relative mt-2 text-3xl font-extrabold tabular-nums">{loading ? "–" : pendingCount} <span className="text-base font-bold">claim{pendingCount === 1 ? "" : "s"}</span></p>
@@ -365,12 +365,12 @@ const AdminExpenses = () => {
           ].map((s, i) => (
             <motion.button type="button" key={s.label} onClick={() => { setFilterStatus(s.status); resetPage(); }}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * (i + 1) }}
-              className={`${CARD} p-4 text-left transition hover:-translate-y-0.5 sm:p-5 ${filterStatus === s.status ? "ring-2 ring-red-300" : ""}`}>
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.tone}`}><s.Icon size={17} /></div>
-              <p className="mt-3 text-2xl font-extrabold tabular-nums text-gray-900" title={s.count ? undefined : inr(s.value)}>
+              className={`${CARD} min-w-0 p-3 text-left transition hover:-translate-y-0.5 sm:p-5 ${filterStatus === s.status ? "ring-2 ring-red-300" : ""}`}>
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl sm:h-9 sm:w-9 ${s.tone}`}><s.Icon size={16} /></div>
+              <p className="mt-2 truncate text-lg font-extrabold tabular-nums text-gray-900 sm:mt-3 sm:text-2xl" title={s.count ? undefined : inr(s.value)}>
                 {loading ? "–" : s.count ? s.value : compactINR(s.value)}
               </p>
-              <p className="text-xs font-semibold text-gray-500">{s.label}</p>
+              <p className="truncate text-[11px] font-semibold text-gray-500 sm:text-xs">{s.label === "Approved · next payroll" ? <><span className="sm:hidden">Approved</span><span className="hidden sm:inline">{s.label}</span></> : s.label}</p>
             </motion.button>
           ))}
         </div>
@@ -378,28 +378,28 @@ const AdminExpenses = () => {
         {/* LIST */}
         <div className={`${CARD} overflow-hidden`}>
           {/* toolbar */}
-          <div className="space-y-3 border-b border-gray-100 p-4 sm:p-5">
+          <div className="space-y-3 border-b border-gray-100 p-3 sm:p-5">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 xl:pb-0">
-                <div className="flex gap-1 rounded-2xl bg-gray-100/80 p-1">
+              <div className="min-w-0">
+                <div className="grid grid-cols-3 gap-1 rounded-2xl bg-gray-100/80 p-1 sm:flex">
                   {STATUSES.map((st) => (
                     <button key={st} onClick={() => { setFilterStatus(st); resetPage(); }}
-                      className={`relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-semibold transition ${filterStatus === st ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
+                      className={`relative flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-xl px-1 py-2 text-[12px] font-semibold transition sm:shrink-0 sm:gap-1.5 sm:px-3.5 sm:text-sm ${filterStatus === st ? "text-white" : "text-gray-500 hover:text-gray-800"}`}>
                       {filterStatus === st && (
                         <motion.span layoutId="exp-tab" className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 shadow-md shadow-red-600/25"
                           transition={{ type: "spring", stiffness: 400, damping: 32 }} />
                       )}
-                      <span className="relative">{st}</span>
-                      <span className={`relative rounded-full px-1.5 text-[11px] font-bold ${filterStatus === st ? "bg-white/25" : st === "Pending" && counts.Pending ? "bg-amber-400 text-white" : "bg-white text-gray-500"}`}>{counts[st]}</span>
+                      <span className="relative truncate">{st}</span>
+                      <span className={`relative rounded-full px-1 text-[10px] font-bold sm:px-1.5 sm:text-[11px] ${filterStatus === st ? "bg-white/25" : st === "Pending" && counts.Pending ? "bg-amber-400 text-white" : "bg-white text-gray-500"}`}>{counts[st]}</span>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <div className="relative sm:w-72">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex">
+                <div className="relative min-w-0 sm:w-72">
                   <Search size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input value={query} onChange={(e) => { setQuery(e.target.value); resetPage(); }}
-                    placeholder="Search employee, ID or expense…"
+                    placeholder="Search claims…"
                     className="w-full rounded-2xl border-0 bg-gray-50 py-2.5 pl-10 pr-9 text-sm text-gray-900 ring-1 ring-gray-200 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-400" />
                   {query && (
                     <button onClick={() => { setQuery(""); resetPage(); }} aria-label="Clear search"
@@ -408,8 +408,8 @@ const AdminExpenses = () => {
                 </div>
                 <div className="relative">
                   <ArrowUpDown size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <select value={sort} onChange={(e) => { setSort(e.target.value); resetPage(); }}
-                    className="w-full appearance-none rounded-2xl border-0 bg-gray-50 py-2.5 pl-10 pr-8 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-red-400">
+                  <select value={sort} onChange={(e) => { setSort(e.target.value); resetPage(); }} aria-label="Sort claims"
+                    className="w-full max-w-[9.5rem] appearance-none truncate rounded-2xl border-0 bg-gray-50 py-2.5 pl-10 pr-3 sm:max-w-none sm:pr-8 text-sm font-semibold text-gray-700 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-red-400">
                     <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
                     <option value="amount-high">Amount: high → low</option>
@@ -419,7 +419,7 @@ const AdminExpenses = () => {
               </div>
             </div>
             {categories.length > 2 && (
-              <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
+              <div className="flex flex-wrap gap-1.5">
                 {categories.map((cat) => {
                   const Icon = cat === "All" ? Receipt : categoryIcon(cat);
                   return (
@@ -461,14 +461,14 @@ const AdminExpenses = () => {
           ) : (
             <>
               {/* MOBILE CARDS */}
-              <div className="space-y-3 p-4 lg:hidden">
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
                 {pageItems.map((c) => {
                   const name = c.employeeId?.userId?.name || "Staff";
                   const m = STATUS_META[c.status] || STATUS_META.Pending;
                   return (
                     <motion.div key={c._id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       onClick={() => setDetail(c._id)}
-                      className="relative cursor-pointer overflow-hidden rounded-2xl bg-white p-4 ring-1 ring-gray-100 transition hover:ring-red-200">
+                      className="relative min-w-0 cursor-pointer overflow-hidden rounded-2xl bg-white p-3.5 ring-1 ring-gray-100 transition hover:ring-red-200">
                       <span className={`absolute inset-y-0 left-0 w-1 ${m.strip}`} />
                       <div className="flex items-start gap-3">
                         <Avatar name={name} />
@@ -476,7 +476,7 @@ const AdminExpenses = () => {
                           <p className="truncate font-bold text-gray-900"><Highlight text={name} q={q} /></p>
                           <p className="truncate text-xs text-gray-500">{c.employeeId?.employeeId} · {c.employeeId?.department?.dep_name || "—"}</p>
                         </div>
-                        <p className="text-lg font-extrabold tabular-nums text-gray-900">{inr(c.amount)}</p>
+                        <p className="shrink-0 text-lg font-extrabold tabular-nums text-gray-900">{inr(c.amount)}</p>
                       </div>
                       <p className="mt-3 truncate text-sm font-semibold text-gray-800"><Highlight text={c.title} q={q} /></p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -546,8 +546,8 @@ const AdminExpenses = () => {
               </div>
 
               {/* FOOTER / PAGINATION */}
-              <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:px-6 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+              <div className="flex flex-col gap-3 border-t border-gray-100 p-3 sm:p-4 sm:px-6 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-gray-500 md:justify-start">
                   <span>Showing <b className="text-gray-900">{start + 1}–{Math.min(start + perPage, filteredClaims.length)}</b> of <b className="text-gray-900">{filteredClaims.length}</b></span>
                   <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">Total {inr(shownTotal)}</span>
                   <div className="flex items-center gap-1">
@@ -559,7 +559,7 @@ const AdminExpenses = () => {
                   </div>
                 </div>
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button onClick={() => setPage(Math.max(cur - 1, 1))} disabled={cur === 1} aria-label="Previous page"
                       className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200 disabled:opacity-30"><ChevronLeft size={16} /></button>
                     {pageList(totalPages, cur).map((p, i) =>
