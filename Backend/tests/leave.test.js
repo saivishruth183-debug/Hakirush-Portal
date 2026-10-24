@@ -5,6 +5,7 @@ import { startTestDb, stopTestDb, clearDb, getApp, seedFixtures, auth } from "./
 import { ensureDomainIndexes, setClock, setJoiningDates, ist } from "./helpers/domain.js";
 
 let app, fx, Leave, Holiday, Notification;
+let emailServiceTestHooks;
 
 before(async () => {
   await startTestDb();
@@ -13,6 +14,7 @@ before(async () => {
   Leave = (await import("../models/Leave.js")).default;
   Holiday = (await import("../models/Holiday.js")).default;
   Notification = (await import("../models/Notification.js")).default;
+  emailServiceTestHooks = (await import("../services/emailService.js")).__testHooks;
 });
 after(async () => {
   await setClock(null);
@@ -31,11 +33,15 @@ const apply = (user, body) => request(app).post("/api/leave/add").set(auth(user)
 const decide = (user, id, status) => request(app).put(`/api/leave/${id}`).set(auth(user)).send({ status });
 
 test("apply: server computes working days (weekends + holidays excluded), client days ignored", async () => {
+  let managerEmail;
+  emailServiceTestHooks.captureLeaveRequestToManagerEmail = (details) => { managerEmail = details; };
   // Thu 10 .. Tue 15: 10, (11 holiday), (12-13 weekend), 14, 15 => 3 days
   const r = await apply(fx.itDev1.user, {
     leaveType: "Casual Leave", startDate: "2026-09-10", endDate: "2026-09-15", reason: "family", days: 99, userId: String(fx.itDev2.user._id),
   });
+  emailServiceTestHooks.captureLeaveRequestToManagerEmail = null;
   assert.equal(r.status, 200);
+  assert.equal(managerEmail.employeeName, fx.itDev1.user.name);
   assert.equal(r.body.leave.days, 3);
   assert.equal(r.body.leave.status, "Pending");
   assert.equal(String(r.body.leave.employeeId), String(fx.itDev1.employee._id)); // body userId ignored
@@ -44,6 +50,14 @@ test("apply: server computes working days (weekends + holidays excluded), client
 
   const note = await Notification.findOne({ type: "leave-request", "data.adminId": fx.admin._id });
   assert.match(note.message, /3 days/);
+  const managerNote = await Notification.findOne({ type: "leave-request", "data.userId": fx.itManager.user._id });
+  assert.ok(managerNote);
+  assert.equal(String(managerNote.data.leaveId), r.body.leave._id);
+  const managerNotifications = await request(app).get("/api/notifications").set(auth(fx.itManager.user));
+  assert.equal(managerNotifications.status, 200);
+  assert.ok(managerNotifications.body.notifications.some((n) => String(n._id) === String(managerNote._id)));
+  const otherManagerNotifications = await request(app).get("/api/notifications").set(auth(fx.opsManager.user));
+  assert.equal(otherManagerNotifications.body.notifications.length, 0);
 
   const cases = [
     [{ leaveType: "Vacation", startDate: "2026-09-21", endDate: "2026-09-21" }, 400],

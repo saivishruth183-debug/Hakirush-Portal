@@ -158,9 +158,9 @@ const addLeave = asyncHandler(async (req, res) => {
         await Notification.create({
           type: "leave-request",
           message: `${req.user.name || "An employee"} applied for ${leaveType} (${days} day${days === 1 ? "" : "s"})`,
-          data: { leaveId: leave._id, employeeId: employee._id, adminId: managerEmp.userId._id, link: "/employee-dashboard" } // Manager views it on their dash
+          data: { leaveId: leave._id, employeeId: employee._id, userId: managerEmp.userId._id, link: "/employee-dashboard/team-requests" }
         });
-        sendLeaveRequestToManagerEmail(managerEmp.userId, employee, leave);
+        sendLeaveRequestToManagerEmail(managerEmp.userId, employee, leave, req.user.name);
         managerNotified = true;
       }
     } else {

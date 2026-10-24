@@ -16,6 +16,7 @@ import { businessDate } from "../utils/orgTime.js";
 import { NOMINAL_HOURS, isIncompleteCheckout, workedMsAt, msToHours } from "../utils/attendanceStatus.js";
 import { now as clockNow } from "../services/clock.js";
 import { getEmployeeForUser } from "../services/employeeScope.js";
+import { sendAttendanceRequestToManagerEmail } from "../services/emailService.js";
 
 const REQUESTABLE = ["Present", "Half Day"];
 const DECISIONS = ["Approved", "Rejected"];
@@ -109,18 +110,19 @@ const createAttendanceRequest = asyncHandler(async (req, res) => {
 
   const department = await Department.findById(employee.department).select("managerEmployeeId").lean();
   if (department?.managerEmployeeId && String(department.managerEmployeeId) !== String(employee._id)) {
-    const manager = await Employee.findById(department.managerEmployeeId).select("userId").lean();
-    if (manager?.userId) {
+    const manager = await Employee.findById(department.managerEmployeeId).populate("userId", "name email isActive").lean();
+    if (manager?.userId && manager.userId.isActive !== false) {
       await Notification.create({
         type: "attendance-request",
         message: `${req.user.name || "An employee"} submitted an attendance correction request for ${date}`,
         data: {
           requestId: request._id,
           employeeId: employee._id,
-          adminId: manager.userId,
+          userId: manager.userId._id,
           link: "/employee-dashboard/team-attendance-requests",
         },
       });
+      await sendAttendanceRequestToManagerEmail(manager.userId, request, req.user.name);
     }
   }
 

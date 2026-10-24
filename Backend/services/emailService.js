@@ -13,6 +13,8 @@ const transporter = nodemailer.createTransport({
 export const __testHooks = {
   capturePasswordResetEmail: null,
   captureExpenseStatusEmail: null,
+  captureLeaveRequestToManagerEmail: null,
+  captureAttendanceRequestToManagerEmail: null,
 };
 
 export const sendPasswordResetOtpEmail = async (user, otp) => {
@@ -104,7 +106,16 @@ export const sendWelcomeEmail = async (user, employee) => {
   await transporter.sendMail(mailOptions);
 };
 
-export const sendLeaveRequestToManagerEmail = async (managerUser, employee, leave) => {
+export const sendLeaveRequestToManagerEmail = async (
+  managerUser,
+  employee,
+  leave,
+  employeeName = employee?.userId?.name || employee?.name || "An employee"
+) => {
+  if (process.env.NODE_ENV === "test" && __testHooks.captureLeaveRequestToManagerEmail) {
+    await __testHooks.captureLeaveRequestToManagerEmail({ managerUser, employee, leave, employeeName });
+    return;
+  }
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return;
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   const loginLink = `${frontendUrl}/login`;
@@ -112,15 +123,48 @@ export const sendLeaveRequestToManagerEmail = async (managerUser, employee, leav
   const mailOptions = {
     from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
     to: managerUser.email,
-    subject: `Leave Request: ${employee.name} (${leave.days} days)`,
+    subject: `Leave Request: ${employeeName} (${leave.days} days)`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
         <h2 style="color: #7A2233; text-align: center;">New Leave Request</h2>
         <p>Hello ${managerUser.name},</p>
-        <p><strong>${employee.name}</strong> has requested a <strong>${leave.leaveType}</strong>.</p>
+        <p><strong>${employeeName}</strong> has requested a <strong>${leave.leaveType}</strong>.</p>
         <ul>
           <li><strong>Duration:</strong> ${leave.days} days</li>
           <li><strong>Reason:</strong> ${leave.reason || "N/A"}</li>
+        </ul>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${loginLink}" style="background-color: #7A2233; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Review in Portal</a>
+        </div>
+      </div>
+    `,
+  };
+
+  await transporter.sendMail(mailOptions).catch(console.error);
+};
+
+export const sendAttendanceRequestToManagerEmail = async (managerUser, request, employeeName = "An employee") => {
+  if (process.env.NODE_ENV === "test" && __testHooks.captureAttendanceRequestToManagerEmail) {
+    await __testHooks.captureAttendanceRequestToManagerEmail({ managerUser, request, employeeName });
+    return;
+  }
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return;
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const loginLink = `${frontendUrl}/employee-dashboard/team-attendance-requests`;
+
+  const mailOptions = {
+    from: `"Hakirush Portal" <${process.env.EMAIL_USER}>`,
+    to: managerUser.email,
+    subject: `Attendance Request: ${employeeName} (${request.date})`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+        <h2 style="color: #7A2233; text-align: center;">New Attendance Correction Request</h2>
+        <p>Hello ${managerUser.name || "Manager"},</p>
+        <p><strong>${employeeName}</strong> submitted an attendance correction request.</p>
+        <ul>
+          <li><strong>Date:</strong> ${request.date}</li>
+          <li><strong>Requested status:</strong> ${request.requestedStatus}</li>
+          <li><strong>Reason:</strong> ${request.reason || "N/A"}</li>
         </ul>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${loginLink}" style="background-color: #7A2233; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Review in Portal</a>

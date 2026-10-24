@@ -4,7 +4,7 @@ import request from "supertest";
 import { startTestDb, stopTestDb, clearDb, getApp, seedFixtures, auth } from "./helpers/testEnv.js";
 import { ensureDomainIndexes, setClock, setJoiningDates, ist } from "./helpers/domain.js";
 
-let app, fx, Attendance, AttendanceRequest, Notification;
+let app, fx, Attendance, AttendanceRequest, Notification, emailServiceTestHooks;
 
 before(async () => {
   await startTestDb();
@@ -13,6 +13,7 @@ before(async () => {
   Attendance = (await import("../models/Attendance.js")).default;
   AttendanceRequest = (await import("../models/AttendanceRequest.js")).default;
   Notification = (await import("../models/Notification.js")).default;
+  emailServiceTestHooks = (await import("../services/emailService.js")).__testHooks;
 });
 after(async () => {
   await setClock(null);
@@ -69,6 +70,29 @@ test("create: validation, server-derived current status, one pending per date", 
   const adminNotes = await Notification.find({ type: "attendance-request", "data.adminId": fx.admin._id });
   assert.equal(adminNotes.length, 2);
   assert.ok(adminNotes[0].data.requestId);
+  const managerNotes = await Notification.find({ type: "attendance-request", "data.userId": fx.itManager.user._id });
+  assert.equal(managerNotes.length, 2);
+  const managerNotifications = await request(app).get("/api/notifications").set(auth(fx.itManager.user));
+  assert.equal(managerNotifications.status, 200);
+  assert.equal(managerNotifications.body.notifications.filter((n) => n.type === "attendance-request").length, 2);
+  const otherManagerNotifications = await request(app).get("/api/notifications").set(auth(fx.opsManager.user));
+  assert.equal(otherManagerNotifications.body.notifications.length, 0);
+});
+
+test("attendance manager email uses the employee's name", async () => {
+  const { sendAttendanceRequestToManagerEmail } = await import("../services/emailService.js");
+  let emailDetails;
+  emailServiceTestHooks.captureAttendanceRequestToManagerEmail = (details) => { emailDetails = details; };
+  await sendAttendanceRequestToManagerEmail(
+    fx.itManager.user,
+    { date: "2026-09-14", requestedStatus: "Present", reason: "Forgot to punch in" },
+    fx.itDev1.user.name
+  );
+  emailServiceTestHooks.captureAttendanceRequestToManagerEmail = null;
+
+  assert.equal(emailDetails.employeeName, "Alan Dev");
+  assert.equal(emailDetails.managerUser.name, "Iris Manager");
+  assert.equal(emailDetails.request.requestedStatus, "Present");
 });
 
 test("approve: no fabricated timestamps, nominal hours, audit fields; second review 409", async () => {

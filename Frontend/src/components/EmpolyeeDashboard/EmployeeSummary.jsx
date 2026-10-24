@@ -15,7 +15,7 @@ import { useAuth } from "../../context/authContext";
 import EmployeePunch from "../attendance/EmployeePunch";
 import { apiErrorMessage } from "../../utils/apiError";
 
-const NOTICE_TYPES = ["leave-status", "attendance-request-status", "expense-status"];
+const NOTICE_TYPES = ["leave-status", "attendance-request-status", "expense-status", "leave-request", "attendance-request"];
 
 /* ================= DESIGN TOKENS ================= */
 const PAGE_BG =
@@ -262,7 +262,7 @@ const EmployeeSummary = () => {
     return !seenByArray.map(id => id.toString()).includes(user?._id?.toString());
   }) || notifications.some(n => !n.seen);
 
-  // Fetch leave-status + attendance-request-status notifications for employee
+  // Fetch employee updates and manager team-request notifications
   useEffect(() => {
     if (!user?._id) return;
     const fetchNotifications = async () => {
@@ -555,6 +555,16 @@ const EmployeeSummary = () => {
       return;
     }
 
+    if (notification.type === "leave-request") {
+      window.location.href = "/employee-dashboard/team-requests";
+      return;
+    }
+
+    if (notification.type === "attendance-request") {
+      window.location.href = "/employee-dashboard/team-attendance-requests";
+      return;
+    }
+
     if (notification.type === "attendance-request-status") {
       const today = new Date();
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -813,12 +823,12 @@ const EmployeeSummary = () => {
                     <div className="max-h-[360px] space-y-1 overflow-y-auto p-3">
                       {notifications.length > 0 && (
                         <>
-                          <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">Expense, leave & attendance updates</p>
+                          <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">Leave, attendance & expense notifications</p>
                           {notifications.map((n) => (
                             <button key={n._id} onClick={() => handleNotificationClick(n)}
                               className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left transition ${n.seen ? "opacity-60 hover:bg-gray-50" : "bg-red-50/70 hover:bg-red-50"}`}>
-                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${n.type === "leave-status" ? "bg-violet-100 text-violet-600" : n.type === "expense-status" ? "bg-amber-100 text-amber-600" : "bg-sky-100 text-sky-600"}`}>
-                                {n.type === "leave-status" ? <Umbrella size={15} /> : n.type === "expense-status" ? <Receipt size={15} /> : <CalendarCheck2 size={15} />}
+                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${n.type.startsWith("leave") ? "bg-violet-100 text-violet-600" : n.type === "expense-status" ? "bg-amber-100 text-amber-600" : "bg-sky-100 text-sky-600"}`}>
+                                {n.type.startsWith("leave") ? <Umbrella size={15} /> : n.type === "expense-status" ? <Receipt size={15} /> : <CalendarCheck2 size={15} />}
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block text-sm font-semibold text-gray-800">{n.message}</span>

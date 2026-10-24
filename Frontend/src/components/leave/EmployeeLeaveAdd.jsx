@@ -19,6 +19,7 @@ const ANNUAL_QUOTA = 12;
 const PATERNITY_QUOTA = 15;          // working days per year
 const MATERNITY_MAX_DAYS = 182;      // 26 weeks per application (calendar days)
 const COMP_OFF_VALID_DAYS = 60;      // claim within this many days of the worked day
+const LATE_APPLY_DAYS = 30;          // forgot to apply? leave can be added up to this many days after it was taken
 const REASON_MAX = 500;
 const REDIRECT_MS = 2000;
 
@@ -572,6 +573,8 @@ const EmployeeLeaveAdd = () => {
   };
 
   const typeMeta = LEAVE_TYPES.find((t) => t.value === leave.leaveType);
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const minStartISO = toLocalYMD(addDays(today0, -LATE_APPLY_DAYS));
   const isInsufficient = !!typeMeta?.quota && daysCount > balance[typeMeta.key];
 
   /* ---------- UI-only derived ---------- */
@@ -595,6 +598,9 @@ const EmployeeLeaveAdd = () => {
     return out;
   }, [leave.startDate, leave.endDate, holidayMap]); // eslint-disable-line
   const calDays = start && end && end >= start ? Math.round((end - start) / 86400000) + 1 : 0;
+  // Late (backdated) request: leave already taken, applied afterwards
+  const isLate = !!leave.startDate && leave.startDate < todayISO;
+  const daysLate = isLate ? Math.round((today0 - start) / 86400000) : 0;
   const skippedHolidays = strip.filter((d) => d.holiday && !d.weekend);
   const type = typeMeta;
   const typeBalance = type?.quota ? balance[type.key] : null;
@@ -611,6 +617,8 @@ const EmployeeLeaveAdd = () => {
       : leave.startDate && leave.startDate <= leave.compOffFor ? "Take the comp-off after the day you worked"
       : daysCount > 1 ? "One worked day = one comp-off day. Pick a single day."
       : ""
+    : leave.startDate && leave.startDate < minStartISO
+      ? `Leave can be added at most ${LATE_APPLY_DAYS} days after it was taken. Please contact HR for older dates.`
     : leave.leaveType === "Maternity Leave" && calDays > MATERNITY_MAX_DAYS
       ? `Maternity leave is up to 26 weeks (${MATERNITY_MAX_DAYS} days) per application`
       : "";
@@ -651,6 +659,7 @@ const EmployeeLeaveAdd = () => {
     : [];
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const startQuick = [
+    ["Yesterday", addDays(today, -1)],
     ["Today", today],
     ["Tomorrow", addDays(today, 1)],
     ["Next Monday", addDays(today, ((8 - today.getDay()) % 7) || 7)],
@@ -662,7 +671,7 @@ const EmployeeLeaveAdd = () => {
       <AnimatePresence>
         {showAlert && (
           <SuccessAlert key="ok"
-            summary={type && start && end ? `${daysCount} day${daysCount === 1 ? "" : "s"} of ${type.label.toLowerCase()}, ${fmtLong(start)}${sameDay(start, end) ? "" : ` – ${fmtLong(end)}`}. Your manager will review it.` : null}
+            summary={type && start && end ? `${daysCount} day${daysCount === 1 ? "" : "s"} of ${type.label.toLowerCase()}, ${fmtLong(start)}${sameDay(start, end) ? "" : ` – ${fmtLong(end)}`}${isLate ? " (late request)" : ""}. Your manager will review it.` : null}
             onClose={() => setShowAlert(false)} />
         )}
         {errorMsg && <ErrorAlert key="err" message={errorMsg} onClose={() => setErrorMsg("")} />}
@@ -680,7 +689,7 @@ const EmployeeLeaveAdd = () => {
           </div>
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">Request leave</h1>
-            <p className="text-sm text-gray-500">Weekends and holidays are skipped automatically.</p>
+            <p className="text-sm text-gray-500">Weekends and holidays are skipped automatically. Forgot to apply? You can add leave up to {LATE_APPLY_DAYS} days after taking it.</p>
           </div>
         </div>
 
@@ -760,13 +769,13 @@ const EmployeeLeaveAdd = () => {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="la-start" className="mb-1.5 block text-xs font-semibold text-gray-600">From</label>
-                  <DatePicker id="la-start" value={leave.startDate} onChange={setStart} min={todayISO} quick={startQuick}
+                  <DatePicker id="la-start" value={leave.startDate} onChange={setStart} min={minStartISO} quick={startQuick}
                     title="Leave starts" placeholder="First day off" invalid={!!errs.startDate}
                     describe={(d) => `${d.toLocaleDateString("en-IN", { weekday: "long" })} · ${relativeLabel(d)}${holidayMap[toLocalYMD(d)] ? " · holiday" : [0, 6].includes(d.getDay()) ? " · weekend" : ""}`} />
                 </div>
                 <div>
                   <label htmlFor="la-end" className="mb-1.5 block text-xs font-semibold text-gray-600">To</label>
-                  <DatePicker id="la-end" value={leave.endDate} onChange={setEnd} min={leave.startDate || todayISO} quick={endQuick}
+                  <DatePicker id="la-end" value={leave.endDate} onChange={setEnd} min={leave.startDate || minStartISO} quick={endQuick}
                     defaultDate={start || undefined}
                     title="Leave ends" placeholder="Last day off" invalid={!!errs.endDate}
                     describe={(d) => `${d.toLocaleDateString("en-IN", { weekday: "long" })} · ${relativeLabel(d)}`} />
@@ -801,6 +810,12 @@ const EmployeeLeaveAdd = () => {
                 )}
               </AnimatePresence>
 
+              {isLate && !typeProblem && (
+                <p className="mt-3 flex items-start gap-2 rounded-2xl bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-amber-100">
+                  <Clock size={14} className="mt-px shrink-0" />
+                  <span><b>Late request</b> — {daysLate === 1 ? "this leave started yesterday" : `this leave started ${daysLate} days ago`}. That's fine if you forgot to apply; it goes to your manager for approval like any other request. Please mention why in the reason.</span>
+                </p>
+              )}
               {typeProblem && leave.startDate && leave.endDate && !(isComp && !leave.compOffFor) && (
                 <p className="mt-3 flex items-center gap-2 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700 ring-1 ring-red-100">
                   <AlertTriangle size={14} className="shrink-0" /> {typeProblem}
@@ -817,7 +832,7 @@ const EmployeeLeaveAdd = () => {
             <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className={`${CARD} p-5 sm:p-6`}>
               <StepTitle n={3} title="Reason" done={!!leave.reason.trim()} error={errs.reason} />
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {(QUICK_REASONS[leave.leaveType] || QUICK_REASONS[""]).map((r) => (
+                {[...(isLate ? ["Forgot to apply in advance"] : []), ...(QUICK_REASONS[leave.leaveType] || QUICK_REASONS[""])].map((r) => (
                   <button key={r} type="button" onClick={() => addReason(r)}
                     className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 ring-1 ring-gray-200 transition hover:text-red-600 hover:ring-red-200">
                     <Sparkles size={11} className="text-red-400" /> {r}
@@ -861,6 +876,9 @@ const EmployeeLeaveAdd = () => {
                 <div className="space-y-3 p-5 sm:p-6">
                   <Row label="Type" value={type ? <span className="inline-flex items-center gap-1.5"><type.Icon size={14} className="text-red-500" />{type.label}</span> : <span className="text-gray-300">Not chosen</span>} />
                   <Row label="Requested by" value={user?.name || "—"} />
+                  {isLate && (
+                    <Row label="Applied" value={<span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700 ring-1 ring-amber-100"><Clock size={11} /> Late · after the date</span>} />
+                  )}
                   {type && !type.quota && (
                     <div className={`rounded-2xl p-3 text-xs ring-1 ${type.soft}`}>
                       <p className="flex items-center gap-1.5 font-bold"><type.Icon size={13} /> {type.note}</p>
